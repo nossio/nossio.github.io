@@ -94,7 +94,7 @@ function previa_(a) {
 // pedidos de namorado(a)/amigo(a) esperando a resposta da pessoa (ou do dono)
 function pedidos_(r) {
   const all = pessoas_(), c = cadLinha_(r.code), eu = c && c.data.personId;
-  const out = pedidosFamilia_(eu, r.role === 'owner').concat(r.role === 'owner' ? pedidosDup_() : []);
+  const out = pedidosFamilia_(eu, r.role === 'owner').concat(r.role === 'owner' ? pedidosDup_().concat(novos_()) : []);
   all.forEach(p => (p.data.links || []).forEach(l => {
     if (!l.confirmado && !l.recusado && (r.role === 'owner' || l.to === eu)) {
       const alvo = all.find(x => x.id === l.to);
@@ -110,7 +110,23 @@ function pedidos_(r) {
       }); })); }
   return out;
 }
+// quem entrou nas últimas 24 h (só para o dono): some depois de um dia, ou quando o dono aprova/edita
+function novos_() {
+  const agora = Date.now(), DIA = 864e5, all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p.data); const out = [];
+  cadastros_().forEach(c => { const d = c.data; if (d.vistoDono || c.personId === DONO_ID) return;
+    if (!d.criado) { d.criado = d.atualizado || agora; salvarCad_(c); }
+    if (agora - d.criado > DIA) return;
+    const P = byId[c.personId] || null, pd = d.pend, alvo = pd && byId[pd.to];
+    out.push({ tipo: 'novo', de: hash_(String(c.code)), pessoa: c.personId || '', nome: d.nome || (P && P.name) || '?', apelido: d.apelido || '',
+      pai: d.pai || '', mae: d.mae || '', nascimento: d.nascimento || '', cidade: d.cidade || '', convidadoPor: d.convidadoPor || '',
+      aguardando: pd ? ((REL_[pd.rel] || pd.rel) + ' de ' + (alvo ? alvo.name : '?')) : '', criado: d.criado });
+  });
+  return out.sort((a, b) => b.criado - a.criado);
+}
 function responder_(r, a) {
+  if (a.novo) { if (r.role !== 'owner') throw new Error('Sem permissão.');
+    const c = cadastros_().find(x => hash_(String(x.code)) === String(a.de)); if (!c) throw new Error('Não encontrado.');
+    c.data.vistoDono = true; salvarCad_(c); return { ok: true }; }
   if (a.familia) return responderFamilia_(r, a);
   if (a.dup) return responderDup_(r, a);
   const c = cadLinha_(r.code), eu = c && c.data.personId, all = pessoas_();

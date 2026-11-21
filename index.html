@@ -18,6 +18,12 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 .vSeg button{border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;padding:7px 10px;cursor:pointer;color:var(--ink)}
 .vSeg button.on{background:var(--ink);color:var(--paper)}
 #pcv{flex:1;min-height:0;display:block;width:100%;touch-action:none;cursor:grab;background:#0b1226}
+#pNovos{flex:none;background:#14204a;color:#e8ecf8;padding:8px 10px;max-height:38vh;overflow:auto;border-bottom:1px solid #2c3a6e}
+#pNovos .nvT{font-size:13px;font-weight:700;color:#ffd98a;margin-bottom:6px}
+#pNovos .nvR{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #24315f}
+#pNovos .nvN{flex:1;font-size:14px;line-height:1.3}#pNovos .nvN span{font-size:12px;color:#b9c3dc}
+#pNovos .nvB{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+#pNovos button{font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid #5a6aa8;background:#1d2b5e;color:#fff;cursor:pointer}
 #pinfo{flex:none;font-size:12px;color:#b9c3dc;background:#0b1226;text-align:center;padding:8px 12px 4px}
 .pctl{position:fixed;right:10px;bottom:12px;z-index:30;display:flex;flex-direction:row;align-items:center;gap:2px;background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:2px;box-shadow:0 3px 8px rgba(0,0,0,.12)}
 .pctl button{border:0;background:none;font:inherit;font-size:13px;width:26px;height:26px;border-radius:13px;cursor:pointer;color:var(--ink);padding:0}
@@ -130,7 +136,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 <div class="status" id="status">Carregando…</div>
 <div id="cadBar" hidden style="margin:0 16px 8px;padding:10px 12px;border:1px solid #e0c48a;background:#fff6e3;border-radius:12px;font-size:14px;display:flex;gap:10px;align-items:center"><span style="flex:1">Falta pouco: diga quem você é na árvore e complete o cadastro.</span><button class="btn green" id="cadBtn" style="padding:8px 14px">Completar</button></div>
 <div class="treewrap" id="wrap"><div id="zoomBox"><div class="tree" id="tree"></div></div><div id="emptyBox"></div></div>
-<div id="pinfo" hidden></div><canvas id="pcv" hidden></canvas>
+<div id="pinfo" hidden></div><div id="pNovos" hidden></div><canvas id="pcv" hidden></canvas>
 <div class="pcard" id="pcard" hidden></div>
 <div class="pctl" id="pctl" hidden><button id="pIn" aria-label="Aproximar">+</button><button id="pOut" aria-label="Afastar">−</button><button id="pAll" aria-label="Ver todos">TODOS</button><button id="pRng" aria-label="Alcance">FAMÍLIAS</button><button id="pRotL" aria-label="Girar para a esquerda">⟲</button><button id="pRotR" aria-label="Girar para a direita">⟳</button><button id="pNorte" aria-label="Voltar ao norte">N</button></div>
 <div class="zoomCtl" id="zoomCtl" hidden><button id="zOut" aria-label="Diminuir">−</button><button id="zPct" aria-label="Ajustar à tela">100%</button><button id="zIn" aria-label="Aumentar">+</button></div>
@@ -143,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2200';
+const APPVER='v20261121-2210';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1027,7 +1033,23 @@ async function showInvite(head){ if(!myCad||!myCad.personId){ try{ ME=null; cons
   document.getElementById('ivX').onclick=closeSheet;
 }
 // pedidos de namoro / amizade (e de ver os filhos) esperando resposta
-async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){ return; } if(!l.length) return;
+// dono: quem entrou nas últimas 24 h aparece no alto dos Planetas até um dia depois, ou até o dono aprovar/editar
+let novos=[];
+function mostraNovos(){ const el=document.getElementById('pNovos'); if(!el) return;
+  const on=!!(isOwner&&typeof viewMode!=='undefined'&&viewMode==='plan'&&novos.length); el.hidden=!on; setTimeout(()=>window.dispatchEvent(new Event('resize')),0); if(!on) return;
+  const ha=t=>{ const m=Math.max(1,Math.round((Date.now()-t)/60000)); return m<60?`há ${m} min`:`há ${Math.round(m/60)} h`; };
+  el.innerHTML=`<div class="nvT">🆕 Entraram agora (${novos.length}) — só você vê</div>`+novos.map((n,i)=>`<div class="nvR"><div class="nvN"><b>${esc(n.nome)}</b>${n.apelido?' ('+esc(n.apelido)+')':''} · ${esc(ha(n.criado))}<br><span>${esc([n.aguardando&&'aguardando: '+n.aguardando,(n.pai||n.mae)&&'filho(a) de '+[n.pai,n.mae].filter(Boolean).join(' e '),n.nascimento&&'nasc. '+n.nascimento.split('-').reverse().join('/'),n.cidade,n.convidadoPor&&'convite de '+n.convidadoPor].filter(Boolean).join(' · '))}</span></div>
+    <div class="nvB">${n.pessoa&&byId(n.pessoa)?`<button data-nv="ver" data-i="${i}">Ver</button><button data-nv="ed" data-i="${i}">✏️ Editar</button>`:''}<button data-nv="ok" data-i="${i}">✓ Aprovar</button></div></div>`).join('');
+  const visto=async n=>{ try{ await gas('responder',{novo:true,de:n.de}); }catch(e){} novos=novos.filter(x=>x!==n); mostraNovos(); };
+  el.querySelectorAll('[data-nv]').forEach(b=>b.onclick=()=>{ const n=novos[+b.dataset.i]; if(!n) return;
+    if(b.dataset.nv==='ver') openPerson(n.pessoa);
+    else if(b.dataset.nv==='ed'){ openForm(n.pessoa,'edit'); visto(n); }
+    else { visto(n); toast('Aprovado'); } });
+}
+async function carregaNovos(){ if(!isOwner||!window.NOSSIO_GAS) return; try{ const l=await gas('pedidos'); novos=(l||[]).filter(x=>x.tipo==='novo'); mostraNovos(); }catch(e){} }
+setInterval(()=>{ if(isOwner&&document.visibilityState==='visible') carregaNovos(); },120000);
+async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){ return; }
+  if(isOwner){ novos=l.filter(x=>x.tipo==='novo'); mostraNovos(); } l=l.filter(x=>x.tipo!=='novo'); if(!l.length) return;
   const p=l[0], T={namorado:'namorado(a)',amigo:'amigo(a)'}, nxt=()=>{ closeSheet(); if(l.length>1) setTimeout(checkPedidos,400); };
   const ans=async(v,extra)=>{ try{ await gas('responder',Object.assign({de:p.de,para:p.para,aceitar:v},extra||{})); toast(v?'Feito':'Recusado'); }catch(e){ toast(String(e.message||'Não foi possível responder')); } nxt(); };
   const btns=(s,n)=>`<button class="btn green" id="pS" style="width:100%;margin-bottom:8px">${s}</button><button class="btn ghost" id="pN" style="width:100%;margin-bottom:8px">${n}</button><button class="btn ghost" id="pD" style="width:100%">Depois</button>`;
@@ -2046,6 +2068,7 @@ function setView(v){
   document.getElementById('vTree').classList.toggle('on',!pl); document.getElementById('vPlan').classList.toggle('on',pl);
   document.getElementById('wrap').hidden=pl; document.getElementById('status').hidden=pl;
   document.getElementById('pcv').hidden=!pl; document.getElementById('pinfo').hidden=!pl; document.getElementById('pctl').hidden=!pl;
+  mostraNovos();
   if(pl){ document.getElementById('zoomCtl').hidden=true; document.getElementById('fab').hidden=true; Planets.show(); }
   else { Planets.hide(); render(); }
 }
