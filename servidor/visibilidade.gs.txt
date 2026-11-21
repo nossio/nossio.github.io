@@ -48,7 +48,7 @@ function vincular_(r, a) {
   if (cad.personId && byId[cad.personId]) throw new Error('Você já está ligado(a) à árvore.');
   if (rel === 'eu' && aba_('cadastro').getDataRange().getValues().slice(1).some(x => String(x[11]) === String(a.to))) throw new Error('Essa pessoa já tem cadastro próprio.');
   let meId;
-  const pendente = ['eu', 'filho', 'irmao', 'conjuge'].includes(rel) && !a.convite;
+  const pendente = ['eu', 'filho', 'irmao', 'conjuge'].includes(rel) && !a.convite && !cad.convidadoPorDono;
   if (pendente) cad.pend = { to: a.to, toNome: to.name, rel, em: Date.now(), confirmadoPor: [], indicados: [] };
   if (rel === 'eu') {
     meId = a.to; if (!pendente) assumir_(meId, cad, r);
@@ -67,7 +67,7 @@ function vincular_(r, a) {
       to.parents = [to.father, to.mother].filter(Boolean); salvarPessoa_(a.to, to);
     }
     // quem veio por convite já está confirmado por quem convidou
-    else if (rel === 'amigo' || rel === 'namorado') { me.links = [{ type: rel, to: a.to, confirmado: !!a.convite, convite: !!a.convite }]; }
+    else if (rel === 'amigo' || rel === 'namorado') { const lib = !!a.convite || (!!cad.convidadoPorDono && a.to === DONO_ID); me.links = [{ type: rel, to: a.to, confirmado: lib, convite: !!a.convite }]; }
     me.parents = [me.father, me.mother].filter(Boolean);
     salvarPessoa_(meId, me);
   }
@@ -286,4 +286,15 @@ function galaxia_(all, ja, sal) {
   const ids = new Set(fora.map(p => p.id)), x = id => id && ids.has(id) ? 'x' + hash_(sal + '|' + id) : null;
   return fora.map(p => { const d = p.data, f = x(d.father), m = x(d.mother);
     return { id: x(p.id), data: { name: '', sex: '', father: f, mother: m, parents: [f, m].filter(Boolean), spouse: x(d.spouse), createdAt: 0, masked: true, fora: true } }; });
+}
+
+// por enquanto: quem diz que foi convidado pelo dono entra liberado, sem confirmação
+const DONO_ID = 'pmwgzm5c0b22l';
+function quemConvidou_(r, a) {
+  const c = cadLinha_(r.code); if (!c) throw new Error('Complete o cadastro antes.');
+  const dono = pessoas_().find(p => p.id === DONO_ID); const q = norm_(a && a.nome);
+  const ok = !!(dono && q && (buscar_([dono], a.nome).length || norm_(dono.data.apelido) === q));
+  c.data.convidadoPor = String(a && a.nome || '').slice(0, 80); c.data.convidadoPorDono = ok;
+  aba_('cadastro').getRange(c.row, 14).setValue(JSON.stringify(c.data));
+  return { dono: ok };
 }

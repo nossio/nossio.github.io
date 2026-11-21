@@ -140,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1450';
+const APPVER='v20261121-1500';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -801,6 +801,7 @@ async function askHow(){ document.body.classList.add('gated');
   const de=LSget(CONVKEY);
   if(de){ let q=null; try{ q=await gas('convidou',{id:de}); }catch(e){}
     if(q&&q.nome) return askInvite(de,q.nome); }
+  if(!window.__quemOk){ return askQuem(); }
   openSheet(`<h2>Como você chegou ao Nossio?</h2><div class="sub">Escolha o que mais combina com você.</div>
     ${opt('eu','🙋 Alguém da família já me colocou na árvore')}
     ${opt('filho','👶 Sou filho(a) de alguém que está no Nossio')}
@@ -816,6 +817,19 @@ async function askHow(){ document.body.classList.add('gated');
       <li>Aqui ninguém é visto contra a vontade: cada um pode se esconder de quem quiser, ou de todos, e pode sair do Nossio quando quiser. Vale na hora, sem perguntas.</li></ul></div>`);
   document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{ const r=b.dataset.h; if(r==='conhecer') return doLink({rel:'conhecer'}); askName(r); });
 }
+// primeira pergunta: quem te convidou (quem foi convidado pelo dono entra liberado, por enquanto)
+function askQuem(){
+  openSheet(`<h2>Quem te convidou?</h2><div class="sub">Escreva o nome de quem mandou o link para você.</div>
+    <input id="qNome" class="inp cad" autocomplete="off" placeholder="Nome de quem convidou">
+    <div id="qErr" class="sub" style="min-height:18px;margin-top:6px"></div>
+    <button class="btn green" id="qGo" style="width:100%;margin-bottom:8px">Continuar</button>
+    <button class="btn ghost" id="qSem" style="width:100%">Ninguém, cheguei sozinho(a)</button>`);
+  const go=async(nome)=>{ let r={dono:false}; if(nome){ try{ r=await gas('quemConvidou',{nome}); }catch(e){} }
+    window.__quemOk=true; window.__porDono=!!r.dono; ME=null; try{ const m=await meP(); if(m.cad) myCad=m.cad; }catch(e){} askHow(); };
+  document.getElementById('qGo').onclick=()=>{ const n=document.getElementById('qNome').value.trim(); if(n.length<2){ document.getElementById('qErr').textContent='Escreva o nome.'; return; } go(n); };
+  document.getElementById('qNome').onkeydown=e=>{ if(e.key==='Enter') document.getElementById('qGo').click(); };
+  document.getElementById('qSem').onclick=()=>go('');
+}
 const PERG={eu:'Quem colocou você? Escreva o seu nome como acha que está na árvore — ou o de um parente seu que está lá.',filho:'Qual o nome do seu pai ou da sua mãe?',conjuge:'Qual o nome do seu marido / da sua esposa?',irmao:'Qual o nome do seu irmão / da sua irmã?',namorado:'Qual o nome do seu namorado / da sua namorada?',amigo:'Qual o nome do seu amigo / da sua amiga?'};
 function askName(rel){
   openSheet(`<h2>${PERG[rel]}</h2><div class="sub">Escreva o nome completo, se souber.</div>
@@ -828,14 +842,14 @@ function askName(rel){
     if(nome.length<3){ res.innerHTML='<div class="sub">Escreva o nome.</div>'; return; }
     res.innerHTML='<div class="sub">Procurando…</div>';
     let l=[]; try{ l=await gas('buscar',{nome}); }catch(e){ res.innerHTML='<div class="sub">Sem conexão. Tente de novo.</div>'; return; }
-    if(!l.length){ res.innerHTML=`<div class="sub">Não encontramos ninguém com esse nome. Confira com quem mandou o link, ou escreva de outro jeito.</div>`; return; }
+    if(!l.length){ res.innerHTML=`<div class="sub">Não encontramos ninguém com esse nome. Tente só o primeiro nome ou o apelido${rel==='eu'?', ou diga de quem você é parente':''}.</div>${rel==='eu'?'<button class="btn green" id="hPar" style="width:100%;margin-top:6px">Não me achei — sou parente de alguém</button>':''}`; const hp=document.getElementById('hPar'); if(hp) hp.onclick=askHow; return; }
     res.innerHTML=`<div class="sub" style="margin-bottom:6px">É uma destas pessoas?</div>`+l.map(p=>`<button class="btn ghost" data-m="${p.id}" style="display:block;width:100%;text-align:left;margin-bottom:6px"><b>${esc(p.name)}</b>${p.ano?' · '+esc(p.ano):''}${p.dica?`<span class="sub" style="display:block;margin:2px 0 0">${esc(p.dica)}</span>`:''}</button>`).join('');
     res.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>confirmLink(rel,b.dataset.m,l.find(x=>x.id===b.dataset.m).name)); };
   document.getElementById('hGo').onclick=go; document.getElementById('hNome').onkeydown=e=>{ if(e.key==='Enter') go(); };
 }
 // confirma com 2 perguntas que quem é da família sabe responder
 async function confirmLink(rel,to,nome){
-  if(rel==='namorado'||rel==='amigo') return doLink({rel,to},nome);
+  if(rel==='namorado'||rel==='amigo'||window.__porDono) return doLink({rel,to},nome);
   openSheet('<h2>Só um instante…</h2>');
   let Q=[]; try{ Q=(await gas('previa',{rel,to})).perguntas||[]; }catch(e){}
   if(!Q.length) return doLink({rel,to},nome);
@@ -859,7 +873,7 @@ async function doLink(a,nome){
   openSheet('<h2>Entrando na árvore…</h2>');
   try{ await gas('vincular',a); }catch(e){ openSheet(`<h2>Não deu certo</h2><div class="sub">${esc(String(e.message||'Tente de novo.'))}</div><button class="btn green" id="eB" style="width:100%">Voltar</button>`); document.getElementById('eB').onclick=askHow; return; }
   LSdel(CONVKEY); ME=null; unGate(); await init();
-  if(['eu','filho','irmao','conjuge'].includes(a.rel)&&!a.convite) return showWait(nome);
+  if(['eu','filho','irmao','conjuge'].includes(a.rel)&&!a.convite&&!window.__porDono) return showWait(nome);
   const pend=(a.rel==='namorado'||a.rel==='amigo')&&!a.convite;
   showInvite(pend?`<h2>Pedido enviado ❤️</h2><div class="sub">Vocês vão aparecer ligados quando <b>${esc(nome)}</b> aceitar. Mande o link para ${esc(nome)} entrar no Nossio e confirmar:</div>`
     : a.rel==='conhecer'?`<h2>Sua árvore começou! 🌱</h2><div class="sub">Agora é só incluir os seus parentes em <b>➕ Incluir</b>. E chame quem você quiser — mande este link:</div>`
