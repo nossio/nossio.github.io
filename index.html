@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2100';
+const APPVER='v20261121-2110';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1964,7 +1964,7 @@ const Planets=(()=>{
   cv.addEventListener('pointerdown',e=>{ cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=false;
     const r=cv.getBoundingClientRect();
     if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),Z:cam.Z,ang:Math.atan2(b.y-a.y,b.x-a.x),yaw:cam.yaw,my:(a.y+b.y)/2,pitch:cam.pitch}; drag=null; return; }
-    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= e.button!==1&&pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===2||e.shiftKey||e.ctrlKey||e.altKey}; if(drag.gira) target=null; });
+    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= e.button!==1&&pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===1||e.button===2||e.shiftKey||e.ctrlKey||e.altKey}; if(drag.gira) target=null; }); // como no Google Earth: rodinha apertada (ou Ctrl/Shift) gira e inclina
   cv.addEventListener('contextmenu',e=>e.preventDefault()); cv.addEventListener('mousedown',e=>{ if(e.button===1) e.preventDefault(); });
   cv.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pinch&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; cam.Z=Math.max(0.002,Math.min(80,pinch.Z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d)); cam.yaw=pinch.yaw-(Math.atan2(b.y-a.y,b.x-a.x)-pinch.ang); cam.pitch=Math.max(-1.55,Math.min(-0.05,pinch.pitch+(((a.y+b.y)/2)-pinch.my)*0.005)); moved=true; draw(); return; }
