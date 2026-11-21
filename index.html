@@ -142,7 +142,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1900';
+const APPVER='v20261121-1910';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1775,6 +1775,8 @@ const Planets=(()=>{
       const f={root:{m},key:u.m.map(x=>x.id).sort().join('+'),blood:[...m,...desc],visit:conj,kids:ks};
       const ss=m.map(x=>solteiro(x)||'').filter(Boolean), fk=deFilhos(ks);
       let nm = ss.length===2 ? (ss[0]===ss[1]?ss[0]:ss[0]+'/'+ss[1]) : ss[0] || fk;
+      // enquanto falta sobrenome de algum dos dois, o planeta usa os primeiros nomes do casal (ex.: Carlão/Izabel)
+      if(m.length===2&&ss.length<2&&m.every(x=>!x.unnamed)) nm=m.map(x=>first(x)).join('/');
       if(m.every(x=>x.unnamed)&&fk) nm=fk;
       f.name = nm ? 'Família '+nm : 'Família de '+call(m.find(x=>!x.unnamed)||m[0]);
       fams.push(f); m.forEach(x=>membroDe[x.id]=f); });
