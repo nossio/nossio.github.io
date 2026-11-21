@@ -139,7 +139,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1400';
+const APPVER='v20261121-1415';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -875,7 +875,7 @@ function showWait(nome){ nome=nome||(myCad&&myCad.pend&&myCad.pend.toNome)||'a p
   document.getElementById('wX').onclick=closeSheet;
   document.getElementById('wGo').onclick=async()=>{ const n=document.getElementById('wNome').value.trim(), res=document.getElementById('wRes'); if(n.length<2) return;
     try{ const r=await gas('indicar',{nome:n}); document.getElementById('wNome').value='';
-      res.textContent = r.enviados ? `Pedido enviado ✔️ ${r.restam?'Você ainda pode indicar '+r.restam+'.':''}` : 'Não achamos ninguém com esse nome que já esteja no Nossio. Mande o link para a pessoa entrar.'; }
+      res.textContent = r.enviados ? `Pedido enviado ✔️ ${r.restam?'Você ainda pode indicar '+r.restam+'.':''}` : 'Ninguém com esse nome pode confirmar ainda: só quem já entrou no Nossio recebe o pedido. Mande o link para a pessoa entrar — assim que ela entrar, você pode indicar de novo.'; }
     catch(e){ res.textContent=String(e.message||'Não foi possível'); } };
 }
 // privacidade: quem pode me ver, quem eu escondi, sair
