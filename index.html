@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2150';
+const APPVER='v20261121-2200';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -512,6 +512,7 @@ function circleOf(f){
 function verArvoreDe(id){ treeRoot=id; verTodos=false; userMoved=false; closeSheet(); if(typeof viewMode!=='undefined'&&viewMode==='plan'){ document.getElementById('vTree').click(); } render(); }
 function render(){
   if(typeof viewMode!=='undefined' && viewMode==='plan'){ Planets.refresh(); return; }
+  if(isOwner&&!window.__vtIni){ window.__vtIni=true; verTodos=true; } // o dono abre vendo o mundo todo
   const all=people; let base=all.filter(p=>!p.fora);
   const r=(!verTodos)&&(()=>{ const pp=people; people=base; try{ return currentRoot(); } finally{ people=pp; } })();
   let inc=null; if(r){ const pp=people; people=base; try{ inc=circleOf(r); } finally{ people=pp; } base=base.filter(p=>inc.has(p.id)); }
@@ -2032,7 +2033,7 @@ const Planets=(()=>{
   return {
     show(){ on=true; build(); resize(); startIdle(); if(!fitted&&fams.length){ cam.Z=Math.min(W,H)*0.46/ext(); fitted=true;
         const eu=isOwner?DONO_ID:(myCad&&myCad.personId); const meu=eu&&(fams.find(f=>f.root.m.some(x=>x.id===eu))||fams.find(f=>f.kids&&f.kids.some(x=>x.id===eu)));
-        if(meu&&meu.c){ cam.T=[...meu.c]; cam.Z=Math.min(W,H)*0.46/Math.max(meu.r*3.2,meu.sys||meu.r); } info('Sistema de famílias · toque num planeta ou numa ponte'); } draw(); },
+        if(meu&&meu.c&&!isOwner){ cam.T=[...meu.c]; cam.Z=Math.min(W,H)*0.46/Math.max(meu.r*3.2,meu.sys||meu.r); } info('Sistema de famílias · toque num planeta ou numa ponte'); } draw(); },
     hide(){ on=false; hideCard(); },
     refresh(){ if(on){ build(); draw(); const box=document.getElementById('pcard'); if(!box.hidden&&highlight.size===1) showCard([...highlight][0]); } },
     focusPerson, get on(){return on}
