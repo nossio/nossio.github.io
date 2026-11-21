@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2120';
+const APPVER='v20261121-2130';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1199,7 +1199,7 @@ function wireLinks(el){ el.querySelectorAll('a[data-go]').forEach(a=>a.onclick=e
 let chats={ask:[],tell:[]}, chat=[], askCtl=null;
 const ASK_REFUSAL='Aqui eu só respondo perguntas sobre o parentesco entre os membros da árvore.';
 function treeData(){
-  return people.map(p=>[p.id,p.name,p.apelido||'',p.sex||'',p.father||'',p.mother||'',p.spouse||'',p.birth||'',p.deceased?'falecido(a)'+(p.death?' em '+p.death:''):'',(p.notes||[]).map(n=>n.t).join(' / '),(p.links||[]).map(l=>l.label+' de '+l.to).join(' / ')].join(' | ')).join('\n');
+  return people.map(p=>[p.id,p.unnamed?p.name+' (SEM NOME AINDA)':p.name,p.apelido||'',p.sex||'',p.father||'',p.mother||'',p.spouse||'',p.birth||'',p.deceased?'falecido(a)'+(p.death?' em '+p.death:''):'',(p.notes||[]).map(n=>n.t).join(' / '),(p.links||[]).map(l=>l.label+' de '+l.to).join(' / ')].join(' | ')).join('\n');
 }
 function rulesTurn(mode){
   const modeTxt = mode==='ask'
@@ -1215,6 +1215,8 @@ Pessoas que já existem: use o id delas (compare nome, apelido e primeiro nome; 
 Relações (a é REL de b): sib = irmão(ã) de; spouse = casado(a) com; parentOf = pai/mãe de; childOf = filho(a) de; uncleOf = tio(a) de; nephewOf = sobrinho(a) de; grandOf = avô/avó de; grandchildOf = neto(a) de; other = outro vínculo de não parente (use label, ex.: "padrinho"). Prefira as relações diretas (sib, childOf, parentOf, spouse). Não repita uma ligação que já existe nos dados.
 Casal: só marido e esposa (casados). NUNCA cadastre nem ligue namorados, noivos, ficantes, amigos ou ex — se a pessoa contar algo assim, não proponha ação e diga no reply: "${NOT_ALLOWED_TXT}". Vínculos aceitos em other: padrinho, madrinha e parecidos.
 Detalhe sobre alguém (ex.: "Zezim tocava violão", "nasceu em Itabira"): ação note.
+ATUALIZAR quem já existe: quando contarem o nome de alguém marcado (SEM NOME AINDA) — ex.: "a mãe de Warley se chama Augusta", "o pai dele era João Laurindo" —, ou corrigirem/completarem nome completo, apelido, sexo, nascimento ou falecimento de alguém da árvore, use a ação update com o id dessa pessoa. NUNCA crie pessoa nova para isso, e nunca coloque frases no nome (o nome é só o nome da pessoa).
+Ex.: {"type":"update","id":"<id da Mãe de Warley>","name":"Augusta"} · {"type":"update","id":"<id>","deceased":true} · {"type":"update","id":"<id>","birth":"1962-03-23","apelido":"Guta"}
 No reply, ao citar alguém que já existe escreva [[id|Nome]] para virar link.
 
 Responda SOMENTE com um JSON:
@@ -1232,6 +1234,7 @@ function describeActions(acts){
   const nm=r=>{const p=byId(r); if(p) return p.name; const n=acts.find(a=>a.type==='person'&&a.ref===r); return n?fmtName(n.name)+' (novo)':'?';};
   return acts.map(a=>a.type==='person'?`Cadastrar <b>${esc(fmtName(a.name))}</b>${a.sex==='F'?' (mulher)':a.sex==='M'?' (homem)':''}`
     : a.type==='rel'?`<b>${esc(nm(a.a))}</b> ${esc(a.rel==='other'?(a.label||'vínculo')+' de':relTxt(a.rel)||a.rel)} <b>${esc(nm(a.b))}</b>`
+    : a.type==='update'?`<b>${esc(nm(a.id))}</b> → ${esc([a.name&&'nome: '+fmtName(a.name),a.apelido&&'apelido: '+a.apelido,a.sex&&('sexo: '+a.sex),a.birth&&'nascimento: '+a.birth,a.deceased===true&&'falecido(a)'+(a.death?' em '+a.death:''),a.deceased===false&&'vivo(a)'].filter(Boolean).join(', '))}`
     : a.type==='note'?`Anotar sobre <b>${esc(nm(a.person))}</b>: “${esc(a.text)}”`:'').filter(Boolean);
 }
 async function applyActions(acts){
@@ -1246,6 +1249,13 @@ async function applyActions(acts){
       if(!relTxt(a.rel)){warns.push('Relação desconhecida.');continue}
       if(a.rel==='other'&&isBlockedLink(a.label||'')){warns.push(NOT_ALLOWED_TXT);continue}
       await applyRel(A,{rel:a.rel,label:String(a.label||'').toLocaleLowerCase('pt-BR')},B,touched); last=last||A; }
+    if(a.type==='update'){ const P=get(a.id); if(!P){warns.push('Não achei a pessoa para atualizar.');continue}
+      if(a.name&&String(a.name).trim()){ P.name=fmtName(String(a.name).trim()); P.unnamed=false; delete P.isPlaceholder; }
+      if(typeof a.apelido==='string'&&a.apelido.trim()) P.apelido=fmtName(a.apelido.trim());
+      if(a.sex==='M'||a.sex==='F') P.sex=a.sex;
+      if(/^\d{4}(-\d{2}){0,2}$/.test(a.birth||'')) P.birth=a.birth;
+      if(a.deceased===true){ P.deceased=true; if(a.death) P.death=String(a.death); } else if(a.deceased===false){ P.deceased=false; P.death=''; }
+      touched.add(P); last=last||P; }
     if(a.type==='note'){ const P=get(a.person); if(P&&a.text){P.notes=[...(P.notes||[]),{t:String(a.text).slice(0,300),at:new Date().toISOString().slice(0,10)}];touched.add(P)} }
   }
   cleanupOrphans(touched);
