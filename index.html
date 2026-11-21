@@ -140,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1700';
+const APPVER='v20261121-1710';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -471,7 +471,7 @@ function layout(){
     addRoot(found.r,found.side,found.anchor,found.friend);
   }
   // deslocamento escolhido pelo usuário (setas "mover a família"): cada toque anda a largura de um cartão
-  blocks.forEach(({r,S})=>{ const dx=r.m.reduce((a,m)=>a+(m.dx||0),0); if(dx) S.n.forEach(o=>o.x+=dx*W); });
+  if(!window.__root) blocks.forEach(({r,S})=>{ const dx=r.m.reduce((a,m)=>a+(m.dx||0),0); if(dx) S.n.forEach(o=>o.x+=dx*W); }); // ajuste manual só no "ver todos"
   const minX=Math.min(...F.n.map(o=>o.x));
   const pos={}; F.n.forEach(o=>pos[o.id]={x:o.x-minX,y:gIdx[o.g]*H});
   return {pos};
@@ -1125,7 +1125,7 @@ function openPerson(id){
   if(canWrite) h+=`<button class="btn green" id="bAdd">+ Parente de ${esc(call(p))}</button><button class="btn green" id="bLink">🔗 Ligar a alguém da árvore</button><button class="btn ghost" id="bEdit">Editar</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
-  if(canWrite && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
+  if(canWrite && !window.__root && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
   if(window.NOSSIO_GAS&&!isOwner&&myCad&&myCad.personId){ const my=myCad.personId===id;
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
