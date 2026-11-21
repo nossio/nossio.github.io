@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2140';
+const APPVER='v20261121-2150';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -505,7 +505,7 @@ function circleOf(f){
   while(anc.length){ const [x,d]=anc.shift(), p=byId(x); if(!p) continue; [p.father,p.mother].forEach(y=>{ if(y&&byId(y)&&!seen.has(y)){ seen.add(y); inc.add(y); anc.push([y,d+1]); if(d+1<=3) desc(y); } }); }
   desc(f);
   const F=byId(f), S=F&&F.spouse&&byId(F.spouse);
-  if(S){ inc.add(S.id); [S.father,S.mother].forEach(y=>{ if(y&&byId(y)) inc.add(y); }); people.forEach(p=>{ if(p.id!==S.id&&((S.father&&p.father===S.father)||(S.mother&&p.mother===S.mother))) inc.add(p.id); }); }
+  if(S){ inc.add(S.id); { const st=[S.id], vs=new Set([S.id]); while(st.length){ const q=byId(st.pop()); if(!q) continue; [q.father,q.mother].forEach(y=>{ if(y&&byId(y)&&!vs.has(y)){ vs.add(y); inc.add(y); st.push(y); } }); } } /* pais, avós, bisavós do cônjuge */ people.forEach(p=>{ if(p.id!==S.id&&((S.father&&p.father===S.father)||(S.mother&&p.mother===S.mother))) inc.add(p.id); }); }
   [...inc].forEach(id=>{ const p=byId(id); if(p&&p.spouse&&byId(p.spouse)) inc.add(p.spouse); });
   return inc;
 }
