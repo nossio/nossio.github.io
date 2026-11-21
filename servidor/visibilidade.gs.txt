@@ -183,7 +183,7 @@ function casa_(all, id) {
 // essa pessoa escolheu não ser vista por quem está olhando?
 function escondido_(all, p, eu) {
   const d = p.data; if (p.id === eu) return false;
-  if (d.saiu) return true;
+  if (d.saiu || d.semNome) return true; // saiu, ou o dono escondeu o nome
   if ((d.bloqueia || []).includes(eu)) return true;
   if (d.oculto === 'casa' && !casa_(all, p.id).has(eu)) return true;
   return false;
@@ -212,7 +212,7 @@ function checaSet_(r, a) {
   const d = a.data || {};
   [d.father, d.mother, d.spouse].forEach(x => { if (x && all.some(p => p.id === x) && !ok.has(x)) throw new Error('Sem permissão para ligar a esta pessoa.'); });
   // campos que só o servidor mexe
-  ['links', 'bloqueia', 'oculto', 'saiu'].forEach(k => { if (antigo && antigo.data[k] !== undefined) d[k] = antigo.data[k]; else delete d[k]; });
+  ['links', 'bloqueia', 'oculto', 'saiu', 'semNome'].forEach(k => { if (antigo && antigo.data[k] !== undefined) d[k] = antigo.data[k]; else delete d[k]; });
 }
 // quem entrou indica mais parentes (até 3) para confirmar; só diz quantos pedidos foram enviados
 function indicar_(r, a) {
