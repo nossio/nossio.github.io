@@ -142,7 +142,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1920';
+const APPVER='v20261121-1940';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -618,7 +618,13 @@ function fitScreen(){
   wrap.addEventListener('touchmove',e=>{ if(pinch&&e.touches.length===2){ e.preventDefault();
     const [a,b]=e.touches; setScale(pinch.s*dist(a,b)/pinch.d,(a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2); } },{passive:false});
   wrap.addEventListener('touchend',e=>{ if(e.touches.length<2) pinch=null; });
-  wrap.addEventListener('wheel',e=>{ if(e.ctrlKey){ e.preventDefault(); setScale(scale*(e.deltaY<0?1.1:0.9),e.clientX,e.clientY);} },{passive:false});
+  // roda do mouse: zoom no ponto do mouse (como num mapa). Shift + roda continua rolando para o lado
+  wrap.addEventListener('wheel',e=>{ if(e.shiftKey) return; e.preventDefault(); setScale(scale*(e.deltaY<0?1.12:1/1.12),e.clientX,e.clientY); userMoved=true; },{passive:false});
+  // arrastar o fundo com o mouse move a árvore
+  let pan=null;
+  wrap.addEventListener('pointerdown',e=>{ if(e.pointerType!=='mouse'||e.button!==0||e.target.closest('.node')) return; pan={x:e.clientX,y:e.clientY,l:wrap.scrollLeft,t:wrap.scrollTop}; wrap.style.cursor='grabbing'; });
+  window.addEventListener('pointermove',e=>{ if(!pan) return; wrap.scrollLeft=pan.l-(e.clientX-pan.x); wrap.scrollTop=pan.t-(e.clientY-pan.y); userMoved=true; });
+  window.addEventListener('pointerup',()=>{ if(pan){ pan=null; wrap.style.cursor=''; } });
   document.getElementById('zIn').onclick=()=>setScale(scale*1.25);
   document.getElementById('zOut').onclick=()=>setScale(scale/1.25);
   document.getElementById('zPct').onclick=()=>{ if(Math.abs(scale-1)<0.01) fitScreen(); else setScale(1); };
@@ -1963,9 +1969,18 @@ const Planets=(()=>{
       if(po){ hideCard(); highlight=new Set([po.pt.person.id]); flyFam(po.pt.target,po.pt.person); }
       else if(b){ hideCard(); flyBridge(b.br); }
       else if(pp){ highlight=new Set([pp.p.id]); anim({spins:[[pp.f,spinTo(pp.f,pp.p)]]},450); showCard(pp.p.id); }
-      else { const pl=planetAt(x,y); hideCard(); if(pl){ highlight=new Set(); flyFam(pl.f); } } }
+      else { const pl=planetAt(x,y); hideCard(); if(pl){ highlight=new Set(); flyFam(pl.f); } else zoomAt(x,y); } }
     drag=null; target=null; });
-  cv.addEventListener('wheel',e=>{ e.preventDefault(); cam.Z=Math.max(0.15,Math.min(12,cam.Z*(e.deltaY<0?1.1:0.9))); draw(); },{passive:false});
+  // toque no espaço vazio: aproxima aquela região (o ponto tocado vem para o centro)
+  function zoomAt(x,y){ const X=(x-W/2)/cam.Z, Y=(y-H/2)/cam.Z, cy=Math.cos(cam.yaw), sy=Math.sin(cam.yaw), sp=Math.sin(cam.pitch);
+    let d=[0,0,0]; if(Math.abs(sp)>0.15){ const zr=-Y/sp; d=[X*cy-zr*sy,0,X*sy+zr*cy]; }
+    anim({T:[cam.T[0]+d[0],cam.T[1],cam.T[2]+d[2]],Z:Math.min(12,cam.Z*1.8)},350); }
+  // roda do mouse: aproxima/afasta no ponto onde está o mouse (o que está embaixo dele fica parado)
+  const worldOff=(x,y)=>{ const X=(x-W/2)/cam.Z, Y=(y-H/2)/cam.Z, cy=Math.cos(cam.yaw), sy=Math.sin(cam.yaw), sp=Math.sin(cam.pitch);
+    if(Math.abs(sp)<0.15) return null; const zr=-Y/sp; return [X*cy-zr*sy,0,X*sy+zr*cy]; };
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    const f=e.deltaY<0?1.12:1/1.12, nz=Math.max(0.15,Math.min(12,cam.Z*f)), k=nz/cam.Z, d=worldOff(x,y);
+    if(d){ cam.T=[cam.T[0]+d[0]*(1-1/k),cam.T[1],cam.T[2]+d[2]*(1-1/k)]; } cam.Z=nz; idle=0; draw(); },{passive:false});
   document.getElementById('pIn').onclick=()=>anim({Z:Math.min(12,cam.Z*1.4)},250);
   document.getElementById('pOut').onclick=()=>anim({Z:Math.max(0.15,cam.Z/1.4)},250);
   document.getElementById('pAll').onclick=()=>{ highlight=new Set(); hideCard(); fitAll(); };
