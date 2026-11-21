@@ -142,7 +142,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1910';
+const APPVER='v20261121-1920';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1780,6 +1780,10 @@ const Planets=(()=>{
       if(m.every(x=>x.unnamed)&&fk) nm=fk;
       f.name = nm ? 'Família '+nm : 'Família de '+call(m.find(x=>!x.unnamed)||m[0]);
       fams.push(f); m.forEach(x=>membroDe[x.id]=f); });
+    // nomes repetidos (várias "Família Bonardi") ganham os primeiros nomes do casal, para cada planeta ter referência concreta
+    { const cnt={}; fams.forEach(f=>cnt[f.name]=(cnt[f.name]||0)+1);
+      fams.forEach(f=>{ if(cnt[f.name]<2) return; const nm=f.root.m.filter(x=>!x.unnamed).map(x=>first(x));
+        if(nm.length) f.name=f.name+' · '+nm.join('/'); else if(f.kids.length){ f.name=f.name+' · pais de '+f.kids.filter(k=>!k.unnamed).slice(0,2).map(k=>first(k)).join(' e '); } }); }
     bridges=[];
     fams.forEach(a=>a.kids.forEach(k=>{ const b=membroDe[k.id]; if(b&&b!==a) bridges.push({a,b,pa:k,pb:k,self:true}); }));
     // casal em que os dois vieram de planetas diferentes: o cônjuge de fora também liga o planeta dele ao do casal (já coberto acima, pois ele é filho lá)
