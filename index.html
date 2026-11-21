@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2040';
+const APPVER='v20261121-2050';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -623,7 +623,8 @@ function fitScreen(){
   wrap.addEventListener('wheel',e=>{ if(e.shiftKey) return; e.preventDefault(); setScale(scale*(e.deltaY<0?1.12:1/1.12),e.clientX,e.clientY); userMoved=true; },{passive:false});
   // arrastar o fundo com o mouse move a árvore
   let pan=null;
-  wrap.addEventListener('pointerdown',e=>{ if(e.pointerType!=='mouse'||e.button!==0||e.target.closest('.node')) return; pan={x:e.clientX,y:e.clientY,l:wrap.scrollLeft,t:wrap.scrollTop}; wrap.style.cursor='grabbing'; });
+  wrap.addEventListener('mousedown',e=>{ if(e.button===1) e.preventDefault(); }); // rodinha apertada: sem a rolagem automática do navegador
+  wrap.addEventListener('pointerdown',e=>{ if(e.pointerType!=='mouse'||!(e.button===0||e.button===1)||(e.button===0&&e.target.closest('.node'))) return; if(e.button===1) e.preventDefault(); pan={x:e.clientX,y:e.clientY,l:wrap.scrollLeft,t:wrap.scrollTop}; wrap.style.cursor='grabbing'; });
   window.addEventListener('pointermove',e=>{ if(!pan) return; wrap.scrollLeft=pan.l-(e.clientX-pan.x); wrap.scrollTop=pan.t-(e.clientY-pan.y); userMoved=true; });
   window.addEventListener('pointerup',()=>{ if(pan){ pan=null; wrap.style.cursor=''; } });
   document.getElementById('zIn').onclick=()=>setScale(scale*1.25);
@@ -1963,8 +1964,8 @@ const Planets=(()=>{
   cv.addEventListener('pointerdown',e=>{ cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=false;
     const r=cv.getBoundingClientRect();
     if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),Z:cam.Z}; drag=null; return; }
-    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===2||e.shiftKey}; });
-  cv.addEventListener('contextmenu',e=>e.preventDefault());
+    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= e.button!==1&&pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===2||e.shiftKey}; });
+  cv.addEventListener('contextmenu',e=>e.preventDefault()); cv.addEventListener('mousedown',e=>{ if(e.button===1) e.preventDefault(); });
   cv.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pinch&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; cam.Z=Math.max(0.002,Math.min(80,pinch.Z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d)); moved=true; draw(); return; }
     if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4) moved=true;
