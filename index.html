@@ -141,7 +141,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1720';
+const APPVER='v20261121-1730';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1758,8 +1758,13 @@ const Planets=(()=>{
     const topU=u=>{let v=u,n=0;while(v.parent&&n++<200)v=v.parent;return v};
     fams=units.filter(u=>!u.parent).map(r=>{ const blood=[],visit=[],st=[r]; while(st.length){const v=st.pop(); v.m.forEach(x=>{ if(v.foreign===x) visit.push(x); else blood.push(x); }); st.push(...v.kids);} return {root:r,key:r.m.map(x=>x.id).sort().join('+'),blood,visit}; });
     units.forEach(u=>{ if(!u.foreign) return; const f=fams.find(f=>f.root===topU(U[u.foreign.father]||U[u.foreign.mother])); if(f&&!f.blood.includes(u.foreign)) f.blood.push(u.foreign); if(f&&u.anchor&&!f.visit.includes(u.anchor)&&!f.blood.includes(u.anchor)) f.visit.push(u.anchor); });
-    fams.forEach(f=>{ const cnt={}; f.blood.filter(p=>!p.unnamed).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; cnt[l]=(cnt[l]||0)+1}});
-      const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; const lead=f.blood.filter(p=>!p.unnamed&&!p.masked).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
+    // pelo sangue: todo descendente do casal do topo também aparece neste planeta (quem casou com alguém de outra família fica nos dois)
+    { const kidsOf={}; ALL.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x)(kidsOf[x]=kidsOf[x]||[]).push(p); }));
+      fams.forEach(f=>{ const tem=new Set([...f.blood,...f.visit].map(p=>p.id)), vis=new Set(), st=[...f.root.m]; f.extra=new Set();
+        while(st.length){ const x=st.pop(); if(vis.has(x.id)) continue; vis.add(x.id); (kidsOf[x.id]||[]).forEach(k=>{ if(!tem.has(k.id)){ tem.add(k.id); f.blood.push(k); f.extra.add(k.id); const sp=k.spouse&&by(k.spouse); if(sp&&!tem.has(sp.id)){ tem.add(sp.id); f.visit.push(sp); f.extra.add(sp.id); } } st.push(k); }); }
+      }); }
+    fams.forEach(f=>{ const cnt={}; f.blood.filter(p=>!p.unnamed&&!(f.extra&&f.extra.has(p.id))).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; cnt[l]=(cnt[l]||0)+1}});
+      const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; const lead=f.blood.filter(p=>!p.unnamed&&!p.masked&&!(f.extra&&f.extra.has(p.id))).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
       f.name= best&&best[1]>=2?'Família '+best[0]:lead?'Família de '+call(lead):'Família'; });
     bridges=[];
     units.forEach(u=>{ if(!u.foreign) return; const a=fams.find(f=>f.root===topU(u)), b=fams.find(f=>f.root===topU(U[u.foreign.father]||U[u.foreign.mother])); if(a&&b&&a!==b) bridges.push({a,b,pa:u.anchor,pb:u.foreign}); });
