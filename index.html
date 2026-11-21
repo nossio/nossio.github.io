@@ -140,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1500';
+const APPVER='v20261121-1600';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -692,7 +692,7 @@ function pickPerson(title,sub,onPick,extra){
   draw(''); document.getElementById('ppQ').oninput=e=>draw(e.target.value);
 }
 function openCad(){
-  if(myCad) return openCadForm();
+  if(myCad) return openMeusDados();
   pickPerson('Bem-vindo(a) ao Nossio! 👋','<b>Passo 1 de 2 — Quem é você?</b> Procure o seu nome na árvore e toque nele. Se você ainda não está aqui, toque no botão lá embaixo.',
     p=>{ cadWho={personId:p.id}; openCadForm(p); },
     `<button class="btn green" id="ppNone" style="width:100%;margin-top:10px">Ainda não estou na árvore</button>`);
@@ -825,10 +825,26 @@ function askQuem(){
     <button class="btn green" id="qGo" style="width:100%;margin-bottom:8px">Continuar</button>
     <button class="btn ghost" id="qSem" style="width:100%">Ninguém, cheguei sozinho(a)</button>`);
   const go=async(nome)=>{ let r={dono:false}; if(nome){ try{ r=await gas('quemConvidou',{nome}); }catch(e){} }
-    window.__quemOk=true; window.__porDono=!!r.dono; ME=null; try{ const m=await meP(); if(m.cad) myCad=m.cad; }catch(e){} askHow(); };
+    window.__quemOk=true; window.__porDono=!!r.dono; ME=null; try{ const m=await meP(); if(m.cad) myCad=m.cad; }catch(e){}
+    if(r.dono){ let l=[]; try{ l=await gas('sugerir'); }catch(e){} if(l&&l.length) return askEVoce(l); }
+    askHow(); };
   document.getElementById('qGo').onclick=()=>{ const n=document.getElementById('qNome').value.trim(); if(n.length<2){ document.getElementById('qErr').textContent='Escreva o nome.'; return; } go(n); };
   document.getElementById('qNome').onkeydown=e=>{ if(e.key==='Enter') document.getElementById('qGo').click(); };
   document.getElementById('qSem').onclick=()=>go('');
+}
+// já liberado: o Nossio acha a ficha da pessoa e pergunta "é você?"
+function askEVoce(l){
+  const f=(myCad&&myCad.nome||'').split(' ')[0];
+  if(l.length===1){ const p=l[0], g=p.sex==='F'?['filha','irmã']:p.sex==='M'?['filho','irmão']:['filho(a)','irmão(ã)'];
+    const partes=[p.pais.length?g[0]+' de '+p.pais.join(' e '):'', p.irmaos.length?g[1]+' de '+p.irmaos.join(' e '):''].filter(Boolean).join(', ');
+    openSheet(`<h2>${esc(f)}, é você? 👀</h2><div class="sub" style="font-size:17px;margin:12px 0">Você é <b>${esc(p.name)}</b>${partes?', '+esc(partes):''}?</div>
+      <button class="btn green" id="ev1" style="width:100%;margin-bottom:8px">Sim, sou eu</button><button class="btn ghost" id="evN" style="width:100%">Não</button>`);
+    document.getElementById('ev1').onclick=()=>doLink({rel:'eu',to:p.id},p.name); document.getElementById('evN').onclick=askHow; return; }
+  openSheet(`<h2>Achamos você? 👀</h2><div class="sub">Toque no seu nome.</div>
+    ${l.map(p=>`<button class="btn ghost" data-ev="${p.id}" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px"><b>${esc(p.name)}</b>${p.dica?`<span class="sub" style="display:block;margin:2px 0 0">${esc(p.dica)}</span>`:''}</button>`).join('')}
+    <button class="btn ghost" id="evN" style="width:100%;border-style:dashed">Não sou nenhum desses</button>`);
+  document.querySelectorAll('[data-ev]').forEach(b=>b.onclick=()=>doLink({rel:'eu',to:b.dataset.ev},l.find(x=>x.id===b.dataset.ev).name));
+  document.getElementById('evN').onclick=askHow;
 }
 const PERG={eu:'Quem colocou você? Escreva o seu nome como acha que está na árvore — ou o de um parente seu que está lá.',filho:'Qual o nome do seu pai ou da sua mãe?',conjuge:'Qual o nome do seu marido / da sua esposa?',irmao:'Qual o nome do seu irmão / da sua irmã?',namorado:'Qual o nome do seu namorado / da sua namorada?',amigo:'Qual o nome do seu amigo / da sua amiga?'};
 function askName(rel){
@@ -893,6 +909,26 @@ function showWait(nome){ nome=nome||(myCad&&myCad.pend&&myCad.pend.toNome)||'a p
       res.textContent = r.enviados ? `Pedido enviado ✔️ ${r.restam?'Você ainda pode indicar '+r.restam+'.':''}` : 'Ninguém com esse nome pode confirmar ainda: só quem já entrou no Nossio recebe o pedido. Mande o link para a pessoa entrar — assim que ela entrar, você pode indicar de novo.'; }
     catch(e){ res.textContent=String(e.message||'Não foi possível'); } };
 }
+// meus dados: as 4 perguntas da entrada, para corrigir quando quiser
+function openMeusDados(){ const c=myCad||{};
+  openSheet(`<h2>Meus dados</h2><div class="sub">Corrija o que precisar.</div>
+    <label class="lbl gq">Nome completo</label><input id="mNome" class="inp cad" value="${esc(c.nome||'')}">
+    <label class="lbl gq">Data de nascimento</label><input id="mNasc" class="inp cad" type="date" value="${esc(c.nascimento||'')}">
+    <label class="lbl gq">Cidade onde nasceu</label><input id="mNat" class="inp cad" value="${esc(c.naturalidade||'')}">
+    <label class="lbl gq">Cidade onde mora</label><input id="mCid" class="inp cad" value="${esc(c.cidade||'')}">
+    <div id="mErr" style="color:var(--red);font-size:14px;min-height:18px;margin-top:8px"></div>
+    <button class="btn green" id="mOk" style="width:100%;margin-bottom:8px">Salvar</button><button class="btn ghost" id="mX" style="width:100%">Voltar</button>`);
+  document.getElementById('mX').onclick=closeSheet;
+  document.getElementById('mOk').onclick=async()=>{ const g=id=>document.getElementById(id).value.trim(), err=t=>document.getElementById('mErr').textContent=t;
+    const nome=fmtName(g('mNome').replace(/\s+/g,' '));
+    if(nome.split(' ').filter(w=>w.length>1).length<2) return err('Escreva o nome completo (nome e sobrenome).');
+    if(!g('mNasc')) return err('Informe a data de nascimento.');
+    const data=Object.assign({},c,{nome,nascimento:g('mNasc'),naturalidade:g('mNat'),cidade:g('mCid'),atualizado:Date.now()});
+    try{ await db.collection('cadastro').doc(myId).set(data); myCad=data; ME=null;
+      const me=myCad.personId&&byId(myCad.personId); // a própria ficha acompanha o nome e o nascimento
+      if(me&&!me.masked&&!me.limited){ me.name=nome; me.birth=data.nascimento; try{ await savePerson(me); }catch(e){} render(); }
+      toast('Dados salvos'); closeSheet(); }catch(e){ err('Não foi possível salvar agora. Tente de novo.'); } };
+}
 // privacidade: quem pode me ver, quem eu escondi, sair
 async function openPrivacy(){ let pv={oculto:'',bloqueados:[]}; try{ pv=await gas('minhaPrivacidade'); }catch(e){}
   openSheet(`<h2>🔒 Minha privacidade</h2><div class="sub">Vale na hora, sem perguntas e sem avisar ninguém.</div>
@@ -901,11 +937,12 @@ async function openPrivacy(){ let pv={oculto:'',bloqueados:[]}; try{ pv=await ga
     <label class="check"><input type="radio" name="pvO" value="casa" ${pv.oculto==='casa'?'checked':''}> Só a minha casa (pais, filhos, irmãos e cônjuge)</label>
     <label class="lbl" style="margin-top:12px">Pessoas que não me veem</label>
     <div id="pvL">${pv.bloqueados.length?pv.bloqueados.map(b=>`<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0"><span>${esc(b.nome)}</span><button class="btn ghost" data-ub="${b.id}" style="padding:6px 10px">Deixar ver</button></div>`).join(''):'<div class="sub">Ninguém. Para esconder-se de alguém, toque na ficha da pessoa e em "Não quero que me veja".</div>'}</div>
-    <button class="btn ghost" id="pvSair" style="width:100%;margin-top:18px;color:var(--red)">Sair do Nossio</button>
+    <button class="btn ghost" id="pvDados" style="width:100%;margin-top:18px">✏️ Meus dados</button>
+    <button class="btn ghost" id="pvSair" style="width:100%;margin-top:8px;color:var(--red)">Sair do Nossio</button>
     <button class="btn green" id="pvX" style="width:100%;margin-top:8px">Fechar</button>`);
   document.querySelectorAll('[name=pvO]').forEach(r=>r.onchange=async()=>{ try{ await gas('privacidade',{oculto:r.value}); toast('Pronto'); }catch(e){ toast('Não foi possível'); } });
   document.querySelectorAll('[data-ub]').forEach(b=>b.onclick=async()=>{ try{ await gas('privacidade',{desbloquear:b.dataset.ub}); openPrivacy(); }catch(e){ toast('Não foi possível'); } });
-  document.getElementById('pvX').onclick=closeSheet;
+  document.getElementById('pvX').onclick=closeSheet; document.getElementById('pvDados').onclick=openMeusDados;
   document.getElementById('pvSair').onclick=()=>{ openSheet(`<h2>Sair do Nossio?</h2><div class="sub">Seu cadastro é apagado e a sua ficha fica vazia para todos, na hora.</div><button class="btn green" id="sS" style="width:100%;margin-bottom:8px;background:var(--red)">Sim, quero sair</button><button class="btn ghost" id="sN" style="width:100%">Voltar</button>`);
     document.getElementById('sN').onclick=openPrivacy;
     document.getElementById('sS').onclick=async()=>{ try{ await gas('sair'); }catch(e){ return toast('Não foi possível agora'); } LSdel(CODEKEY); document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;font-family:Inter,system-ui,sans-serif;background:#f5efe3"><p style="font-size:17px">Pronto. Você saiu do Nossio.<br>Obrigado!</p></div>'; }; };
@@ -927,6 +964,10 @@ async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){
   const p=l[0], T={namorado:'namorado(a)',amigo:'amigo(a)'}, nxt=()=>{ closeSheet(); if(l.length>1) setTimeout(checkPedidos,400); };
   const ans=async(v,extra)=>{ try{ await gas('responder',Object.assign({de:p.de,para:p.para,aceitar:v},extra||{})); toast(v?'Feito':'Recusado'); }catch(e){ toast(String(e.message||'Não foi possível responder')); } nxt(); };
   const btns=(s,n)=>`<button class="btn green" id="pS" style="width:100%;margin-bottom:8px">${s}</button><button class="btn ghost" id="pN" style="width:100%;margin-bottom:8px">${n}</button><button class="btn ghost" id="pD" style="width:100%">Depois</button>`;
+  if(p.tipo==='dup'){
+    openSheet(`<h2>É a mesma pessoa? 👥</h2><div class="sub" style="font-size:16px">${p.quem?esc(p.quem)+' incluiu':'Foi incluído(a)'} <b>${esc(p.nome)}</b> (${esc(p.descNovo)}).<br><br>Já existe <b>${esc(p.paraNome)}</b> (${esc(p.descVelho)}). É a mesma pessoa?</div>
+      <div class="sub" style="font-size:13px">Se for, as duas fichas viram uma só, com o nome mais completo.</div>${btns('Sim, juntar','Não, são diferentes')}`);
+    document.getElementById('pS').onclick=()=>ans(true,{dup:true}); document.getElementById('pN').onclick=()=>ans(false,{dup:true}); document.getElementById('pD').onclick=closeSheet; return; }
   if(p.tipo==='familia'){ const R={filho:'filho(a)',irmao:'irmão / irmã',conjuge:'marido / esposa'}, pn=esc(p.paraNome), nm='<b>'+esc(p.nome)+'</b>';
     const txt = p.rel==='eu' ? `${nm} diz que é <b>${pn}</b>, que já está na árvore. É essa pessoa mesmo?`
       : p.sou==='alvo' ? `${nm} diz que é seu ${R[p.rel]||'parente'}. É verdade?`
@@ -1021,8 +1062,8 @@ function describe(p){
 function openPerson(id){
   const p=byId(id), F=byId(p.father), M=byId(p.mother);
   const souEu=!isOwner&&myCad&&myCad.personId===id;
-  if(p&&souEu&&(p.masked||p.limited)){ openSheet(`<h2>${esc(p.name||myCad.nome)}</h2><div class="sub">Esta é você. ${myCad.pend?'A família ainda não confirmou.':''}</div>${myCad.pend?'<button class="btn green" id="mkW" style="width:100%;margin-bottom:8px">Pedir confirmação</button>':''}<button class="btn ghost" id="mkP" style="width:100%;margin-bottom:8px">🔒 Minha privacidade</button><button class="btn ghost" id="mkX" style="width:100%">Fechar</button>`);
-    document.getElementById('mkX').onclick=closeSheet; document.getElementById('mkP').onclick=openPrivacy; const w=document.getElementById('mkW'); if(w) w.onclick=()=>showWait(); return; }
+  if(p&&souEu&&(p.masked||p.limited)){ openSheet(`<h2>${esc(p.name||myCad.nome)}</h2><div class="sub">Esta é você. ${myCad.pend?'A família ainda não confirmou.':''}</div>${myCad.pend?'<button class="btn green" id="mkW" style="width:100%;margin-bottom:8px">Pedir confirmação</button>':''}<button class="btn ghost" id="mkM" style="width:100%;margin-bottom:8px">✏️ Meus dados</button><button class="btn ghost" id="mkP" style="width:100%;margin-bottom:8px">🔒 Minha privacidade</button><button class="btn ghost" id="mkX" style="width:100%">Fechar</button>`);
+    document.getElementById('mkX').onclick=closeSheet; document.getElementById('mkP').onclick=openPrivacy; document.getElementById('mkM').onclick=openMeusDados; const w=document.getElementById('mkW'); if(w) w.onclick=()=>showWait(); return; }
   if(p&&(p.masked||p.limited)){ const eu=myCad&&byId(myCad.personId), meuAmigo=eu&&(eu.links||[]).some(l=>l.confirmado&&l.to===p.id);
     openSheet(`<h2>${p.masked?'Ficha da família':esc(p.name)}</h2><div class="sub">${p.masked?'Esta pessoa está na árvore, mas os dados só aparecem para quem autorizar.':'Você vê só o nome. Os outros dados aparecem só para a família.'}</div>${meuAmigo?`<button class="btn green" id="mkF" style="width:100%;margin-bottom:8px">Pedir para ver os filhos de ${esc(call(p))}</button>`:''}<button class="btn ghost" id="mkX" style="width:100%">Fechar</button>`);
     document.getElementById('mkX').onclick=closeSheet;
@@ -1045,12 +1086,13 @@ function openPerson(id){
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
   if(canWrite && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
   if(window.NOSSIO_GAS&&!isOwner&&myCad&&myCad.personId){ const my=myCad.personId===id;
-    h+=`<div style="margin-top:14px"><button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
+    h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
   openSheet(h);
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
+  { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
   { const bp=document.getElementById('bPriv'); if(bp) bp.onclick=()=>myCad.personId===id?openPrivacy():hideFrom(p); }
   if(canWrite){
     document.getElementById('bAdd').onclick=()=>openForm(id,'add');

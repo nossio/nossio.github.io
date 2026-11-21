@@ -94,7 +94,7 @@ function previa_(a) {
 // pedidos de namorado(a)/amigo(a) esperando a resposta da pessoa (ou do dono)
 function pedidos_(r) {
   const all = pessoas_(), c = cadLinha_(r.code), eu = c && c.data.personId;
-  const out = pedidosFamilia_(eu, r.role === 'owner');
+  const out = pedidosFamilia_(eu, r.role === 'owner').concat(r.role === 'owner' ? pedidosDup_() : []);
   all.forEach(p => (p.data.links || []).forEach(l => {
     if (!l.confirmado && !l.recusado && (r.role === 'owner' || l.to === eu)) {
       const alvo = all.find(x => x.id === l.to);
@@ -112,6 +112,7 @@ function pedidos_(r) {
 }
 function responder_(r, a) {
   if (a.familia) return responderFamilia_(r, a);
+  if (a.dup) return responderDup_(r, a);
   const c = cadLinha_(r.code), eu = c && c.data.personId, all = pessoas_();
   const p = all.find(x => x.id === a.de); if (!p) throw new Error('Pedido não encontrado.');
   if (a.filho) { // autorização para ver um filho
@@ -212,6 +213,7 @@ function checaSet_(r, a) {
   if (antigo && !ok.has(antigo.id)) throw new Error('Sem permissão para alterar esta pessoa.');
   const d = a.data || {};
   [d.father, d.mother, d.spouse].forEach(x => { if (x && all.some(p => p.id === x) && !ok.has(x)) throw new Error('Sem permissão para ligar a esta pessoa.'); });
+  if (!antigo && d.name) { const dup = parecidos_(all, d); if (dup.length) d.possivelDup = dup; }
   // campos que só o servidor mexe
   ['links', 'bloqueia', 'oculto', 'saiu', 'semNome'].forEach(k => { if (antigo && antigo.data[k] !== undefined) d[k] = antigo.data[k]; else delete d[k]; });
 }
@@ -303,4 +305,67 @@ function quemConvidou_(r, a) {
   c.data.convidadoPor = nome; c.data.convidadoPorId = achou ? achou.id : null; c.data.convidadoPorDono = !!achou;
   aba_('cadastro').getRange(c.row, 14).setValue(JSON.stringify(c.data));
   return { dono: !!achou, nome: achou ? (achou.name || (achou.data && achou.data.name)) : '' };
+}
+
+// quem foi liberado: o Nossio procura a ficha dele na árvore pelo nome e nascimento e pergunta "é você?"
+function sugerir_(r) {
+  const c = cadLinha_(r.code); if (!c || !c.data.convidadoPorDono || c.data.personId) return [];
+  const cad = c.data, all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p.data);
+  const ocupados = new Set(cadastros_().map(x => x.personId).filter(Boolean));
+  const q = norm_(cad.nome).split(' ').filter(Boolean), ano = String(cad.nascimento || '').slice(0, 4);
+  const nomeDe = id => byId[id] && !byId[id].unnamed ? byId[id].name.split(' ')[0] : '';
+  return all.filter(p => !ocupados.has(p.id) && !p.data.unnamed && !p.data.saiu && !p.data.semNome && !p.data.deceased).map(p => {
+    const d = p.data, t = norm_(d.name).split(' '), ap = norm_(d.apelido), py = String(d.birth || '').slice(0, 4);
+    if (!(t[0] === q[0] || (ap && ap === q[0]))) return null;
+    if (py && ano && Math.abs(+py - +ano) > 1) return null;
+    let sc = 2; q.slice(1).forEach(w => { if (t.includes(w)) sc += 1; }); if (py && py === ano) sc += 2; if (t.length === 1) sc += 0.5;
+    return { p, sc };
+  }).filter(Boolean).sort((a, b) => b.sc - a.sc).slice(0, 3).map(({ p }) => {
+    const d = p.data, pais = [nomeDe(d.father), nomeDe(d.mother)].filter(Boolean);
+    const irm = all.filter(x => x.id !== p.id && !x.data.unnamed && ((d.father && x.data.father === d.father) || (d.mother && x.data.mother === d.mother))).slice(0, 2).map(x => x.data.apelido || x.data.name.split(' ')[0]);
+    return { id: p.id, name: d.name, sex: d.sex || '', pais, irmaos: irm, dica: (pais.length ? (d.sex === 'F' ? 'filha de ' : d.sex === 'M' ? 'filho de ' : 'filho(a) de ') + pais.join(' e ') : '') + (d.spouse && byId[d.spouse] && !byId[d.spouse].unnamed ? (pais.length ? ' · ' : '') + 'casado(a) com ' + nomeDe(d.spouse) : '') };
+  });
+}
+
+// ---------- duplicados: quem inclui alguém que já existe (nome parecido) gera uma pergunta para o dono ----------
+function parecidos_(all, d) {
+  const t = norm_(d.name).split(' ').filter(Boolean); if (!t.length) return [];
+  return all.filter(p => !p.data.unnamed && p.data.name).filter(p => {
+    const u = norm_(p.data.name).split(' '), ap = norm_(p.data.apelido);
+    const prim = u[0] === t[0] || (ap && ap === t[0]) || (u.length === 1 && t[0].startsWith(u[0].slice(0, 4)) && u[0].slice(0, 4).length === 4);
+    if (!prim) return false;
+    const sob = t.slice(1).some(w => w.length > 2 && u.includes(w));
+    const pais = (d.father && d.father === p.data.father) || (d.mother && d.mother === p.data.mother);
+    return sob || pais || u.length === 1;
+  }).slice(0, 3).map(p => p.id);
+}
+function pedidosDup_() {
+  const all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p.data); const out = [];
+  const nm = id => byId[id] && !byId[id].unnamed ? byId[id].name.split(' ')[0] : '';
+  const desc = d => { const ps = [nm(d.father), nm(d.mother)].filter(Boolean); return ps.length ? 'filho(a) de ' + ps.join(' e ') : (d.spouse && nm(d.spouse) ? 'casado(a) com ' + nm(d.spouse) : 'sem pais na árvore'); };
+  all.forEach(p => (p.data.possivelDup || []).forEach(o => { const O = byId[o]; if (!O) return;
+    out.push({ tipo: 'dup', de: p.id, nome: p.data.name, quem: p.data.createdByName || '', descNovo: desc(p.data), para: o, paraNome: O.name, descVelho: desc(O) }); }));
+  return out;
+}
+// junta a ficha nova na antiga: fica o nome mais completo, o resto aponta para a antiga
+function mesclar_(novoId, velhoId) {
+  const all = pessoas_(), N = all.find(p => p.id === novoId), V = all.find(p => p.id === velhoId); if (!N || !V) throw new Error('Ficha não encontrada.');
+  const n = N.data, v = V.data;
+  if (n.name.split(' ').length > v.name.split(' ').length) { if (!v.apelido) v.apelido = v.name.split(' ')[0]; v.name = n.name; }
+  ['birth', 'sex', 'father', 'mother', 'spouse', 'photo', 'death'].forEach(k => { if (!v[k] && n[k]) v[k] = n[k]; });
+  if (n.deceased) v.deceased = true; v.parents = [v.father, v.mother].filter(Boolean);
+  salvarPessoa_(velhoId, v);
+  all.forEach(p => { if (p.id === novoId || p.id === velhoId) return; let mud = false; const x = p.data;
+    ['father', 'mother', 'spouse'].forEach(k => { if (x[k] === novoId) { x[k] = velhoId; mud = true; } });
+    (x.links || []).forEach(l => { if (l.to === novoId) { l.to = velhoId; mud = true; } });
+    if (x.possivelDup) { x.possivelDup = x.possivelDup.filter(i => i !== novoId); mud = true; }
+    if (mud) { x.parents = [x.father, x.mother].filter(Boolean); salvarPessoa_(p.id, x); } });
+  cadastros_().forEach(c => { if (c.personId === novoId) { c.data.personId = velhoId; aba_('cadastro').getRange(c.row, 12).setValue(velhoId); salvarCad_(c); } });
+  const s = aba_('people'), ids = s.getRange(1, 1, s.getLastRow(), 1).getValues().map(x => String(x[0])); const i = ids.indexOf(novoId); if (i > 0) s.deleteRow(i + 1);
+}
+function responderDup_(r, a) {
+  if (r.role !== 'owner') throw new Error('Só o administrador junta fichas.');
+  if (a.aceitar) { mesclar_(String(a.de), String(a.para)); return { ok: true }; }
+  const p = pessoas_().find(x => x.id === String(a.de)); if (p) { p.data.possivelDup = (p.data.possivelDup || []).filter(i => i !== String(a.para)); salvarPessoa_(p.id, p.data); }
+  return { ok: true };
 }
