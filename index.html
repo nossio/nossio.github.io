@@ -139,7 +139,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1440';
+const APPVER='v20261121-1445';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1031,11 +1031,11 @@ function openPerson(id){
   if(canWrite && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
   if(window.NOSSIO_GAS&&!isOwner&&myCad&&myCad.personId){ const my=myCad.personId===id;
     h+=`<div style="margin-top:14px"><button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
-  if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para a família':'🙈 Esconder o nome de '+esc(call(p))+' (só você vê)'}</button></div>`;
+  if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
   openSheet(h);
   wireLinks(document.getElementById('sheetBody'));
-  { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido: só você vê':'Nome visível para a família'); }catch(e){} openPerson(id); render(); }; }
+  { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
   { const bp=document.getElementById('bPriv'); if(bp) bp.onclick=()=>myCad.personId===id?openPrivacy():hideFrom(p); }
   if(canWrite){
     document.getElementById('bAdd').onclick=()=>openForm(id,'add');
