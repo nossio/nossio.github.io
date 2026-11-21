@@ -140,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1610';
+const APPVER='v20261121-1700';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -337,7 +337,7 @@ async function sortByAge(id){
 }
 
 // casal com os pais dos dois lados na árvore: fica do lado mais perto de quem está olhando (para o dono, o do marido)
-function viewerDist(){ const me=(!isOwner&&myCad&&myCad.personId)?myCad.personId:null; if(!me||!byId(me)) return null;
+function viewerDist(){ const me=window.__root||null; if(!me||!byId(me)) return null;
   if(viewerDist._k===me+'|'+people.length) return viewerDist._d;
   const d={[me]:0}, q=[me], kids={}; people.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x)(kids[x]=kids[x]||[]).push(p.id); }));
   while(q.length){ const x=q.shift(), p=byId(x); if(!p) continue; [p.father,p.mother,p.spouse,...(kids[x]||[])].forEach(y=>{ if(y&&d[y]===undefined&&byId(y)){ d[y]=d[x]+1; q.push(y); } }); }
@@ -480,10 +480,41 @@ function avatar(p,size){const ini=(p.name||'?').trim()[0]?.toUpperCase()||'?';
   return `<div class="av" ${size?`style="width:${size}px;height:${size}px;font-size:${size*.4}px"`:''}>${p.photo?`<img src="${p.photo}" alt="">`:esc(ini)}</div>`}
 function lifeLine(p){const b=year(p.birth),d=year(p.death);if(p.deceased)return `${b||'?'} – ${d||'†'}`;return p.birth?fmtDate(p.birth):''}
 
+/* ---------- árvore centrada numa pessoa (como MyHeritage/FamilySearch): os dois lados juntos ---------- */
+let treeRoot=null, verTodos=false;
+const DONO_ID='pmwgzm5c0b22l';
+function rootDefault(){ const me=isOwner?DONO_ID:(myCad&&myCad.personId); if(me&&byId(me)&&!byId(me).masked) return me;
+  const c=[...people].filter(p=>!p.fora&&!p.masked&&!p.unnamed).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)); return c[0]?c[0].id:null; }
+function currentRoot(){ if(treeRoot&&byId(treeRoot)) return treeRoot; return rootDefault(); }
+// quem aparece na árvore de F: antepassados; tudo que descende dos avós e bisavós (tios, primos, sobrinhos);
+// os descendentes de F; os cônjuges de todos; e os sogros e cunhados de F
+function circleOf(f){
+  const inc=new Set(), kids={}; people.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x)(kids[x]=kids[x]||[]).push(p.id); }));
+  const desc=id=>{ const st=[id]; while(st.length){ const x=st.pop(); if(inc.has(x)&&x!==id) continue; inc.add(x); (kids[x]||[]).forEach(k=>{ if(!inc.has(k)) st.push(k); }); } };
+  inc.add(f); const anc=[[f,0]], seen=new Set([f]);
+  while(anc.length){ const [x,d]=anc.shift(), p=byId(x); if(!p) continue; [p.father,p.mother].forEach(y=>{ if(y&&byId(y)&&!seen.has(y)){ seen.add(y); inc.add(y); anc.push([y,d+1]); if(d+1<=3) desc(y); } }); }
+  desc(f);
+  const F=byId(f), S=F&&F.spouse&&byId(F.spouse);
+  if(S){ inc.add(S.id); [S.father,S.mother].forEach(y=>{ if(y&&byId(y)) inc.add(y); }); people.forEach(p=>{ if(p.id!==S.id&&((S.father&&p.father===S.father)||(S.mother&&p.mother===S.mother))) inc.add(p.id); }); }
+  [...inc].forEach(id=>{ const p=byId(id); if(p&&p.spouse&&byId(p.spouse)) inc.add(p.spouse); });
+  return inc;
+}
+function verArvoreDe(id){ treeRoot=id; verTodos=false; userMoved=false; closeSheet(); if(typeof viewMode!=='undefined'&&viewMode==='plan'){ document.getElementById('vTree').click(); } render(); }
 function render(){
   if(typeof viewMode!=='undefined' && viewMode==='plan'){ Planets.refresh(); return; }
-  if(people.some(p=>p.fora)){ const all=people; people=all.filter(p=>!p.fora); try{ renderPlanta(); } finally { people=all; } return; }
-  renderPlanta();
+  const all=people; let base=all.filter(p=>!p.fora);
+  const r=(!verTodos)&&(()=>{ const pp=people; people=base; try{ return currentRoot(); } finally{ people=pp; } })();
+  let inc=null; if(r){ const pp=people; people=base; try{ inc=circleOf(r); } finally{ people=pp; } base=base.filter(p=>inc.has(p.id)); }
+  people=base; window.__root=r||null;
+  try{ renderPlanta(); } finally { people=all; }
+  // linha de cima: de quem é a árvore
+  const R=r&&byId(r), tot=all.filter(p=>!p.fora&&!p.masked).length, vis=base.filter(p=>!p.masked).length;
+  const st=document.getElementById('status'); if(st&&all.length){
+    st.innerHTML = R ? `Árvore de <b>${esc(R.masked?'você':call(R))}</b> · ${vis} de ${tot} pessoas${myCad&&myCad.pend?' · aguardando a família confirmar você':''} · <a href="#" id="stMe">${R.id===rootDefault()?'':'voltar para a minha'}</a>${isOwner?` <a href="#" id="stAll">ver todos</a>`:''}`
+      : `Todos · ${tot} pessoas · <a href="#" id="stMe">ver a minha árvore</a>`;
+    const a=document.getElementById('stMe'); if(a) a.onclick=e=>{ e.preventDefault(); treeRoot=null; verTodos=false; userMoved=false; render(); };
+    const b=document.getElementById('stAll'); if(b) b.onclick=e=>{ e.preventDefault(); verTodos=true; userMoved=false; render(); };
+  }
 }
 function renderPlanta(){
   const tree=document.getElementById('tree'), empty=document.getElementById('emptyBox'), fab=document.getElementById('fab');
@@ -547,7 +578,7 @@ function renderPlanta(){
   tree.querySelectorAll('.node').forEach(n=>n.onclick=()=>openPerson(n.dataset.id));
   if(focusId){const f=tree.querySelector(`.node[data-id="${focusId}"]`); if(f) f.classList.add('focus');}
   // ao abrir: centraliza em você e repete a cada carga de dados, até você mexer na árvore
-  if(!userMoved && people.length){ const me=[...people].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
+  if(!userMoved && people.length){ const me=(window.__root&&byId(window.__root))||[...people].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
     const go=()=>{ if(userMoved) return; const w=document.getElementById('wrap'), zb=document.getElementById('zoomBox'), n=document.querySelector(`.node[data-id="${me.id}"]`); if(!n) return;
       w.scrollLeft = zb.offsetLeft + (n.offsetLeft+70)*scale - w.clientWidth/2;
       w.scrollTop = zb.offsetTop + (n.offsetTop+88)*scale - w.clientHeight/2; };
@@ -1092,7 +1123,7 @@ function openPerson(id){
     ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
   if(canWrite) h+=`<button class="btn green" id="bAdd">+ Parente de ${esc(call(p))}</button><button class="btn green" id="bLink">🔗 Ligar a alguém da árvore</button><button class="btn ghost" id="bEdit">Editar</button>`;
-  h+=`<button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
+  h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
   if(canWrite && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
   if(window.NOSSIO_GAS&&!isOwner&&myCad&&myCad.personId){ const my=myCad.personId===id;
@@ -1117,6 +1148,7 @@ function openPerson(id){
   }
   document.getElementById('bKin').onclick=()=>openKin(people[0].id===id?null:people[0].id,id);
   document.getElementById('bCenter').onclick=()=>centerOn(id);
+  document.getElementById('bTree').onclick=()=>verArvoreDe(id);
   const setSide=async d=>{ p.dx=(p.dx||0)+d; try{ await savePerson(p); }catch(e){} closeSheet(); render(); setTimeout(()=>centerOn(p.id),300); };
   if(document.getElementById('bSideL')){ document.getElementById('bSideL').onclick=()=>setSide(-1); document.getElementById('bSideR').onclick=()=>setSide(1); }
   if(document.getElementById('bLeft')){ document.getElementById('bLeft').onclick=()=>moveSibling(id,-1); document.getElementById('bRight').onclick=()=>moveSibling(id,1); document.getElementById('bAge').onclick=()=>sortByAge(id); }
