@@ -22,6 +22,7 @@ header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px s
 .pctl{position:fixed;right:10px;bottom:12px;z-index:30;display:flex;flex-direction:row;align-items:center;gap:2px;background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:2px;box-shadow:0 3px 8px rgba(0,0,0,.12)}
 .pctl button{border:0;background:none;font:inherit;font-size:13px;width:26px;height:26px;border-radius:13px;cursor:pointer;color:var(--ink);padding:0}
 .pctl #pAll{font-size:7px;font-weight:700;width:34px}
+.pctl #pRng{font-size:7px;font-weight:700;width:46px}
 .pcard{position:fixed;left:10px;right:10px;bottom:48px;z-index:31;background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:12px 14px 10px;box-shadow:0 8px 22px rgba(0,0,0,.14);max-height:42vh;overflow:auto}
 .pcard h4{font-family:Fraunces,serif;font-size:17px;margin:0 0 4px;display:flex;justify-content:space-between;gap:8px}
 .pcard h4 button{border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer;padding:0 2px}
@@ -130,7 +131,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 <div class="treewrap" id="wrap"><div id="zoomBox"><div class="tree" id="tree"></div></div><div id="emptyBox"></div></div>
 <div id="pinfo" hidden></div><canvas id="pcv" hidden></canvas>
 <div class="pcard" id="pcard" hidden></div>
-<div class="pctl" id="pctl" hidden><button id="pIn" aria-label="Aproximar">+</button><button id="pOut" aria-label="Afastar">−</button><button id="pAll" aria-label="Ver todos">TODOS</button></div>
+<div class="pctl" id="pctl" hidden><button id="pIn" aria-label="Aproximar">+</button><button id="pOut" aria-label="Afastar">−</button><button id="pAll" aria-label="Ver todos">TODOS</button><button id="pRng" aria-label="Alcance">FAMÍLIAS</button></div>
 <div class="zoomCtl" id="zoomCtl" hidden><button id="zOut" aria-label="Diminuir">−</button><button id="zPct" aria-label="Ajustar à tela">100%</button><button id="zIn" aria-label="Aumentar">+</button></div>
 <button class="btn green fab" id="fab" hidden>+ Incluir pessoa</button>
 <div class="scrim" id="scrim"></div>
@@ -141,7 +142,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1845';
+const APPVER='v20261121-1900';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1743,7 +1744,7 @@ const Planets=(()=>{
   const NW=140,NH=176,HROW=170;
   const cv=document.getElementById('pcv'), ctx=cv.getContext('2d');
   let W=0,H=0,dpr=1, on=false, fams=[], bridges=[], hits=[], pairMode=false, highlight=new Set();
-  let cam={yaw:0.6,pitch:-0.7,T:[0,0,0],Z:1}, fitted=false;
+  let cam={yaw:0.6,pitch:-0.7,T:[0,0,0],Z:1}, fitted=false, alcance='familias';
   const fitZ=()=>{ let mx=1,my=1; fams.forEach(f=>{ mx=Math.max(mx,Math.abs(f.c[0])+f.r); my=Math.max(my,Math.abs(f.c[1])+f.r+40); }); return Math.min(W*0.47/mx,H*0.45/my); };
   const spins={};               // giro de cada planeta, guardado pelo id da raiz
   const ext=()=>{ let e=0; fams.forEach(f=>e=Math.max(e,Math.hypot(...f.c)+f.r)); return e||100; };
@@ -1823,11 +1824,11 @@ const Planets=(()=>{
     // tudo no plano horizontal, como o sistema solar visto de cima e de lado
     const pos=(f,c,a0)=>{ f.c=[c[0],0,c[1]]; const ls=luas.get(f); if(!ls.length) return; const d=dist.get(f);
       const tot=ls.reduce((a,l)=>a+2*R(l)+40,0); let a=a0;
-      ls.forEach(l=>{ const w=(2*R(l)+40)/tot*2*Math.PI; a+=w/2; pos(l,[c[0]+Math.cos(a)*d,c[1]+Math.sin(a)*d],a+Math.PI); a+=w/2; }); };
+      ls.forEach(l=>{ const w=(2*R(l)+40)/tot*2*Math.PI; a+=w/2; l.orb={c:[c[0],0,c[1]],d}; l.lua=true; pos(l,[c[0]+Math.cos(a)*d,c[1]+Math.sin(a)*d],a+Math.PI); a+=w/2; }); };
     const sois=fams.filter(f=>!mae.has(f)).sort((a,b)=>R(b)-R(a));
     if(sois.length===1) pos(sois[0],[0,0],0);
     else { const big=sois[0]; pos(big,[0,0],0); const resto=sois.slice(1), tot=resto.reduce((a,f)=>a+2*R(f)+80,0), rr=Math.max(R(big)+Math.max(...resto.map(R))+120, tot/(2*Math.PI));
-      let a=0; resto.forEach(f=>{ const w=(2*R(f)+80)/tot*2*Math.PI; a+=w/2; pos(f,[Math.cos(a)*rr,Math.sin(a)*rr],a); a+=w/2; }); }
+      let a=0; resto.forEach(f=>{ const w=(2*R(f)+80)/tot*2*Math.PI; a+=w/2; f.orb={c:[0,0,0],d:rr}; pos(f,[Math.cos(a)*rr,Math.sin(a)*rr],a); a+=w/2; }); }
     fams.forEach(f=>{ if(!f.c) f.c=[0,0,0]; f.sys=R(f); });
   }
   // câmera e projeção
@@ -1850,14 +1851,16 @@ const Planets=(()=>{
     if(!on) return;
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); hits=[]; sky();
     if(!fams.length){ ctx.fillStyle='#b9c3dc'; ctx.font='14px Inter,system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText('Cadastre pessoas na planta para ver os planetas.',W/2,H/2); return; }
-    const bPts=bridges.map(br=>{ const na=br.a.nodes.find(n=>n.p===br.pa), nb=br.b.nodes.find(n=>n.p===br.pb); if(!na||!nb) return null; const A=surf(br.a,na.u).p, B=surf(br.b,nb.u).p; return {br,A,B,k:arc(A,B)}; }).filter(Boolean);
+    const bPts=bridges.filter(br=>alcance!=='galaxia'||(!br.a.lua&&!br.b.lua)).map(br=>{ const na=br.a.nodes.find(n=>n.p===br.pa), nb=br.b.nodes.find(n=>n.p===br.pb); if(!na||!nb) return null; const A=surf(br.a,na.u).p, B=surf(br.b,nb.u).p; return {br,A,B,k:arc(A,B)}; }).filter(Boolean);
     // órbitas suaves em volta do planeta maior
-    const big=fams.find(f=>f.c[0]===0&&f.c[2]===0);
-    if(big){ ctx.strokeStyle='rgba(180,200,255,.10)'; ctx.lineWidth=1; fams.forEach(f=>{ if(f===big) return; const d=Math.hypot(f.c[0],f.c[2]); ctx.beginPath(); for(let i=0;i<=72;i++){ const a=i/72*2*Math.PI; const c=rotSys([Math.sin(a)*d,f.c[1],Math.cos(a)*d]), t=rotSys(cam.T); const q=scr([c[0]-t[0],c[1]-t[1],c[2]-t[2]]); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);} ctx.stroke(); }); }
+    ctx.strokeStyle='rgba(180,200,255,.10)'; ctx.lineWidth=1; const feitas=new Set();
+    fams.forEach(f=>{ if(!f.orb) return; if(alcance==='galaxia'&&f.lua) return; const k=f.orb.c.join(',')+'|'+Math.round(f.orb.d); if(feitas.has(k)) return; feitas.add(k);
+      ctx.beginPath(); for(let i=0;i<=72;i++){ const a=i/72*2*Math.PI; const c=rotSys([f.orb.c[0]+Math.sin(a)*f.orb.d,0,f.orb.c[2]+Math.cos(a)*f.orb.d]), t=rotSys(cam.T), q=scr([c[0]-t[0],c[1]-t[1],c[2]-t[2]]); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y); } ctx.stroke(); });
     bPts.forEach(({br,A,B,k})=>{ ctx.lineCap='round'; if(br.pa.separated) ctx.setLineDash([10,8]); [[10,'rgba(255,200,110,.12)'],[5,'rgba(255,200,110,.25)'],[2,'rgba(255,214,140,.95)']].forEach(([w,c])=>{ ctx.strokeStyle=c; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.quadraticCurveTo(k.cx,k.cy,B.x,B.y); ctx.stroke(); }); ctx.setLineDash([]); });
     const bigDiscs=[];
     [...fams].sort((a,b)=>camC(a)[2]-camC(b)[2]).forEach(f=>{
       const C=scr(camC(f)), rad=f.r*cam.Z; if(C.x+rad<-50||C.x-rad>W+50||C.y+rad<-50||C.y-rad>H+50) return;
+      ctx.globalAlpha = (alcance==='galaxia'&&f.lua)?0.3:1;
       const [lt,dk]=PAL[fams.indexOf(f)%PAL.length];
       const glow=ctx.createRadialGradient(C.x,C.y,rad*0.92,C.x,C.y,rad*1.28); glow.addColorStop(0,hexA(lt,0.35)); glow.addColorStop(1,hexA(lt,0)); ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(C.x,C.y,rad*1.28,0,Math.PI*2); ctx.fill();
       const body=ctx.createRadialGradient(C.x-rad*0.35,C.y-rad*0.4,0,C.x,C.y,rad); body.addColorStop(0,lt); body.addColorStop(0.7,dk); body.addColorStop(1,'#141a33');
@@ -1868,7 +1871,7 @@ const Planets=(()=>{
       if(gridA>0.01) for(let k=-5;k<=5;k++){ const ph=k*Math.PI/12; ctx.beginPath(); let st=true; for(let i=0;i<=48;i++){ const th=i/48*2*Math.PI; const s=surf(f,[Math.cos(ph)*Math.sin(th),-Math.sin(ph),Math.cos(ph)*Math.cos(th)]); if(s.front<0){st=true;continue} st?ctx.moveTo(s.p.x,s.p.y):ctx.lineTo(s.p.x,s.p.y); st=false;} ctx.stroke(); }
       if(gridA>0.01) for(let m=0;m<16;m++){ const th=m/16*2*Math.PI; ctx.beginPath(); let st=true; for(let i=0;i<=30;i++){ const ph=-Math.PI/2+i/30*Math.PI; const s=surf(f,[Math.cos(ph)*Math.sin(th),-Math.sin(ph),Math.cos(ph)*Math.cos(th)]); if(s.front<0){st=true;continue} st?ctx.moveTo(s.p.x,s.p.y):ctx.lineTo(s.p.x,s.p.y); st=false;} ctx.stroke(); }
       const sc=rad/f.Rl;
-      const showNames = sc>0.06 && (rad>Math.min(W,H)*0.3 || (pairMode && rad>50 && f.nodes.some(n=>highlight.has(n.p.id))));
+      const showNames = alcance==='pessoas' ? (rad>45) : (alcance!=='galaxia' && sc>0.06 && (rad>Math.min(W,H)*0.3 || (pairMode && rad>50 && f.nodes.some(n=>highlight.has(n.p.id)))));
       if(showNames){ bigDiscs.push({x:C.x,y:C.y,r:rad}); ctx.lineCap='round';
         const boltQ=[]; const boltAt=(a,b,w,al)=>{ const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L, h=Math.min(5,L*0.35);
           ctx.strokeStyle=`rgba(255,255,255,${al})`; ctx.lineWidth=w; ctx.lineJoin='round'; ctx.beginPath(); ctx.moveTo(a.x,a.y);
@@ -1893,10 +1896,10 @@ const Planets=(()=>{
           const tw=ctx.measureText(t).width; hits.push({type:'portal',pt,x:e.p.x,y:e.p.y+8,w:Math.max(tw,30)+10,h:36}); }); }
       // nomes que não se atropelam: se o lugar já tem um nome (de um planeta maior), este fica sem nome até aproximar
       const ty0=C.y+rad+18; ctx.font='600 15px Inter,system-ui,sans-serif'; const lw=ctx.measureText(f.name).width+10, lr={x1:C.x-lw/2,x2:C.x+lw/2,y1:ty0-10,y2:ty0+28};
-      const livre=!(draw._lbl||[]).some(q=>lr.x1<q.x2&&lr.x2>q.x1&&lr.y1<q.y2&&lr.y2>q.y1);
+      const livre=!(alcance==='galaxia'&&f.lua) && !(draw._lbl||[]).some(q=>lr.x1<q.x2&&lr.x2>q.x1&&lr.y1<q.y2&&lr.y2>q.y1);
       if((!showNames||sc<0.28)&&livre){ (draw._lbl=draw._lbl||[]).push(lr); ctx.font='600 15px Inter,system-ui,sans-serif'; ctx.fillStyle='#ffffff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=6;
         const ty=showNames?C.y+rad+18:C.y+rad+18; ctx.fillText(f.name,C.x,ty); ctx.font='12px Inter,system-ui,sans-serif'; ctx.fillStyle='#b9c3dc'; ctx.fillText(f.blood.length+(f.blood.length===1?' pessoa':' pessoas'),C.x,ty+18); ctx.shadowBlur=0; }
-      hits.push({type:'planet',f,x:C.x,y:C.y,r:rad});
+      hits.push({type:'planet',f,x:C.x,y:C.y,r:rad}); ctx.globalAlpha=1;
     });
     bPts.forEach(({br,k})=>{ const mx=k.top.x,my=k.top.y; if(bigDiscs.some(d=>Math.hypot(mx-d.x,my-d.y)<d.r)) return;
       if(!pairMode){ ctx.fillStyle='rgba(20,26,51,.9)'; ctx.strokeStyle='#ffd68c'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(mx,my,12,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#ffd68c'; ctx.font='600 12px Inter,system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(br.pa.separated?'⚡':'♥',mx,my+0.5); hits.push({type:'bridge',br,x:mx,y:my,w:30,h:30}); return; }
@@ -1960,6 +1963,10 @@ const Planets=(()=>{
   document.getElementById('pIn').onclick=()=>anim({Z:Math.min(12,cam.Z*1.4)},250);
   document.getElementById('pOut').onclick=()=>anim({Z:Math.max(0.15,cam.Z/1.4)},250);
   document.getElementById('pAll').onclick=()=>{ highlight=new Set(); hideCard(); fitAll(); };
+  // alcance, como no GPS de aviação: Galáxia (só os sóis) → Famílias (planetas e luas) → Pessoas (fichas com nome)
+  document.getElementById('pRng').onclick=()=>{ const L=['galaxia','familias','pessoas'], N={galaxia:'GALÁXIA',familias:'FAMÍLIAS',pessoas:'PESSOAS'};
+    alcance=L[(L.indexOf(alcance)+1)%L.length]; document.getElementById('pRng').textContent=N[alcance]; idle=0;
+    info({galaxia:'Galáxia · só as famílias mais antigas',familias:'Famílias · planetas e luas',pessoas:'Pessoas · os nomes em cada planeta'}[alcance]); draw(); };
   function startIdle(){ if(idleOn) return; idleOn=true; let last=performance.now();
     (function tick(t){ if(!on){idleOn=false;return} const dt=t-last; last=t; idle+=dt;
       if(idle>2500 && cam.Z<=Math.min(W,H)*0.46/ext()*1.6 && !pairMode && !highlight.size && ptrs.size===0 && document.getElementById('pcard').hidden){ cam.yaw+=dt*0.00006; draw(); }
