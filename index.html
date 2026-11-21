@@ -141,7 +141,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1740';
+const APPVER='v20261121-1845';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1744,6 +1744,7 @@ const Planets=(()=>{
   const cv=document.getElementById('pcv'), ctx=cv.getContext('2d');
   let W=0,H=0,dpr=1, on=false, fams=[], bridges=[], hits=[], pairMode=false, highlight=new Set();
   let cam={yaw:0.6,pitch:-0.7,T:[0,0,0],Z:1}, fitted=false;
+  const fitZ=()=>{ let mx=1,my=1; fams.forEach(f=>{ mx=Math.max(mx,Math.abs(f.c[0])+f.r); my=Math.max(my,Math.abs(f.c[1])+f.r+40); }); return Math.min(W*0.47/mx,H*0.45/my); };
   const spins={};               // giro de cada planeta, guardado pelo id da raiz
   const ext=()=>{ let e=0; fams.forEach(f=>e=Math.max(e,Math.hypot(...f.c)+f.r)); return e||100; };
   function build(){
@@ -1756,21 +1757,29 @@ const Planets=(()=>{
     units.forEach(u=>{ let v=u.parent,n=0; while(v&&n++<200){ if(v===u){u.parent=null;break} v=v.parent; } });
     units.forEach(u=>{ if(u.parent) u.parent.kids.push(u); });
     const topU=u=>{let v=u,n=0;while(v.parent&&n++<200)v=v.parent;return v};
-    fams=units.filter(u=>!u.parent).map(r=>{ const blood=[],visit=[],st=[r]; while(st.length){const v=st.pop(); v.m.forEach(x=>{ if(v.foreign===x) visit.push(x); else blood.push(x); }); st.push(...v.kids);} return {root:r,key:r.m.map(x=>x.id).sort().join('+'),blood,visit}; });
-    units.forEach(u=>{ if(!u.foreign) return; const f=fams.find(f=>f.root===topU(U[u.foreign.father]||U[u.foreign.mother])); if(f&&!f.blood.includes(u.foreign)) f.blood.push(u.foreign); if(f&&u.anchor&&!f.visit.includes(u.anchor)&&!f.blood.includes(u.anchor)) f.visit.push(u.anchor); });
-    // pelo sangue: todo descendente do casal do topo também aparece neste planeta (quem casou com alguém de outra família fica nos dois)
-    { const kidsOf={}; ALL.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x)(kidsOf[x]=kidsOf[x]||[]).push(p); }));
-      fams.forEach(f=>{ const tem=new Set([...f.blood,...f.visit].map(p=>p.id)), vis=new Set(), st=[...f.root.m]; f.extra=new Set();
-        while(st.length){ const x=st.pop(); if(vis.has(x.id)) continue; vis.add(x.id); (kidsOf[x.id]||[]).forEach(k=>{ if(!tem.has(k.id)){ tem.add(k.id); f.blood.push(k); f.extra.add(k.id); const sp=k.spouse&&by(k.spouse); if(sp&&!tem.has(sp.id)){ tem.add(sp.id); f.visit.push(sp); f.extra.add(sp.id); } } st.push(k); }); }
-      }); }
-    fams.forEach(f=>{ const cnt={}; f.blood.filter(p=>!p.unnamed&&!(f.extra&&f.extra.has(p.id))).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; cnt[l]=(cnt[l]||0)+1}});
-      const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; const lead=f.blood.filter(p=>!p.unnamed&&!p.masked&&!(f.extra&&f.extra.has(p.id))).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
-      f.name= best&&best[1]>=2?'Família '+best[0]:lead?'Família de '+call(lead):'Família';
-      // quem entrou pelo sangue de outra família (ex.: filhos da Terezinha no planeta Rocha) dá o segundo nome: Rocha/Ferreira
-      if(best&&best[1]>=2&&f.extra&&f.extra.size){ const c2={}; f.blood.filter(p=>f.extra.has(p.id)&&!p.unnamed&&!p.masked).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; if(l!==best[0]) c2[l]=(c2[l]||0)+1}});
-        const b2=Object.entries(c2).sort((a,b)=>b[1]-a[1])[0]; if(b2&&b2[1]>=2) f.name='Família '+best[0]+'/'+b2[0]; } });
+    // cada casal (ou pai/mãe sozinho) com os filhos é um planeta; quem nasceu num e formou outro é a ponte entre os dois
+    const kidsOf={}; ALL.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x&&by(x))(kidsOf[x]=kidsOf[x]||[]).push(p); }));
+    const PARTS=new Set(['da','de','do','das','dos','e']);
+    const pal=p=>(p&&!p.unnamed&&p.name?p.name.trim().split(/\s+/).filter(w=>!PARTS.has(w.toLowerCase())):[]);
+    const solteiro=p=>{ const w=pal(p); if(w.length<2) return ''; const sp=p.spouse&&by(p.spouse), ws=pal(sp);
+      if(ws.length>1&&w[w.length-1]===ws[ws.length-1]&&w.length>2&&p.sex!=='M') return w[w.length-2]; return w[w.length-1]; };
+    const deFilhos=ks=>{ const c={}; ks.forEach(k=>{ const x=solteiro(k); if(x) c[x]=(c[x]||0)+1; }); const b=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; return b?b[0]:''; };
+    fams=[]; const membroDe={};
+    units.forEach(u=>{ const ks=[]; const vistos=new Set(); u.m.forEach(x=>(kidsOf[x.id]||[]).forEach(k=>{ if(!vistos.has(k.id)){ vistos.add(k.id); ks.push(k); } }));
+      if(!ks.length&&u.m.length<2&&(u.m[0].father||u.m[0].mother)) return; // solteiro sem filhos fica só no planeta dos pais
+      const m=[...u.m].sort((a,b)=>(a.sex==='M'?0:1)-(b.sex==='M'?0:1));
+      // o planeta leva toda a descendência do casal (filhos, netos, bisnetos...) e os cônjuges deles
+      const desc=[], dv=new Set(m.map(x=>x.id)), st=[...ks]; while(st.length){ const k=st.shift(); if(dv.has(k.id)) continue; dv.add(k.id); desc.push(k); (kidsOf[k.id]||[]).forEach(n=>st.push(n)); }
+      const conj=[]; desc.forEach(k=>{ const sp=k.spouse&&by(k.spouse); if(sp&&!dv.has(sp.id)){ dv.add(sp.id); conj.push(sp); } });
+      const f={root:{m},key:u.m.map(x=>x.id).sort().join('+'),blood:[...m,...desc],visit:conj,kids:ks};
+      const ss=m.map(x=>solteiro(x)||'').filter(Boolean), fk=deFilhos(ks);
+      let nm = ss.length===2 ? (ss[0]===ss[1]?ss[0]:ss[0]+'/'+ss[1]) : ss[0] || fk;
+      if(m.every(x=>x.unnamed)&&fk) nm=fk;
+      f.name = nm ? 'Família '+nm : 'Família de '+call(m.find(x=>!x.unnamed)||m[0]);
+      fams.push(f); m.forEach(x=>membroDe[x.id]=f); });
     bridges=[];
-    units.forEach(u=>{ if(!u.foreign) return; const a=fams.find(f=>f.root===topU(u)), b=fams.find(f=>f.root===topU(U[u.foreign.father]||U[u.foreign.mother])); if(a&&b&&a!==b) bridges.push({a,b,pa:u.anchor,pb:u.foreign}); });
+    fams.forEach(a=>a.kids.forEach(k=>{ const b=membroDe[k.id]; if(b&&b!==a) bridges.push({a,b,pa:k,pb:k,self:true}); }));
+    // casal em que os dois vieram de planetas diferentes: o cônjuge de fora também liga o planeta dele ao do casal (já coberto acima, pois ele é filho lá)
     // cada família desenhada como na planta e enrolada na esfera
     const saved=people;
     fams.forEach(f=>{
@@ -1799,9 +1808,27 @@ const Planets=(()=>{
     });
     people=saved;
     const sorted=[...fams].sort((a,b)=>b.Rl-a.Rl), big=sorted[0];
-    fams.forEach(f=>f.r=f.Rl/big.Rl*100);
-    big.c=[0,0,0];
-    sorted.slice(1).forEach((f,i,arr)=>{ const a=i*(2*Math.PI/arr.length)+0.4; const d=big.r+f.r+150+i*20; f.c=[Math.sin(a)*d,(i%2?-1:1)*18,Math.cos(a)*d]; });
+    fams.forEach(f=>f.r=Math.max(55,Math.min(100,30+12*Math.sqrt(f.blood.length+f.visit.length))));
+    // sistema solar: o planeta que um filho formou gira em volta do planeta dos pais dele, como a Lua em volta da Terra
+    const mae=new Map(); bridges.forEach(br=>{ if(!br.self) return; const atual=mae.get(br.b);
+      // se o casal veio de dois planetas, fica na órbita do lado do marido (o outro lado continua ligado pela ponte)
+      if(!atual || (br.pa.sex==='M' && atual.pa.sex!=='M')) mae.set(br.b,{f:br.a,pa:br.pa}); });
+    // evita ciclos
+    mae.forEach((v,k)=>{ let x=v.f,n=0; while(x&&n++<100){ if(x===k){ mae.delete(k); break; } x=mae.get(x)&&mae.get(x).f; } });
+    const luas=new Map(); fams.forEach(f=>luas.set(f,[])); mae.forEach((v,k)=>luas.get(v.f).push(k));
+    const raio=new Map(), dist=new Map();
+    const R=f=>{ if(raio.has(f)) return raio.get(f); const ls=luas.get(f); if(!ls.length){ raio.set(f,f.r); return f.r; }
+      const rs=ls.map(R), maxr=Math.max(...rs), soma=rs.reduce((a,b)=>a+2*b+40,0);
+      const d=Math.max(f.r+maxr+60, soma/(2*Math.PI)); dist.set(f,d); const v=d+maxr; raio.set(f,v); return v; };
+    // tudo no plano horizontal, como o sistema solar visto de cima e de lado
+    const pos=(f,c,a0)=>{ f.c=[c[0],0,c[1]]; const ls=luas.get(f); if(!ls.length) return; const d=dist.get(f);
+      const tot=ls.reduce((a,l)=>a+2*R(l)+40,0); let a=a0;
+      ls.forEach(l=>{ const w=(2*R(l)+40)/tot*2*Math.PI; a+=w/2; pos(l,[c[0]+Math.cos(a)*d,c[1]+Math.sin(a)*d],a+Math.PI); a+=w/2; }); };
+    const sois=fams.filter(f=>!mae.has(f)).sort((a,b)=>R(b)-R(a));
+    if(sois.length===1) pos(sois[0],[0,0],0);
+    else { const big=sois[0]; pos(big,[0,0],0); const resto=sois.slice(1), tot=resto.reduce((a,f)=>a+2*R(f)+80,0), rr=Math.max(R(big)+Math.max(...resto.map(R))+120, tot/(2*Math.PI));
+      let a=0; resto.forEach(f=>{ const w=(2*R(f)+80)/tot*2*Math.PI; a+=w/2; pos(f,[Math.cos(a)*rr,Math.sin(a)*rr],a); a+=w/2; }); }
+    fams.forEach(f=>{ if(!f.c) f.c=[0,0,0]; f.sys=R(f); });
   }
   // câmera e projeção
   const rotSys=p=>{ const cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw); let x=p[0]*cy+p[2]*sy, z=-p[0]*sy+p[2]*cy; const cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch); return [x,p[1]*cp-z*sp,p[1]*sp+z*cp]; };
@@ -1819,7 +1846,7 @@ const Planets=(()=>{
     STARS.forEach(st=>{ const x=((st.x*W+cam.yaw*40)%W+W)%W, y=((st.y*H+cam.pitch*30)%H+H)%H; ctx.globalAlpha=st.a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,st.s,0,Math.PI*2); ctx.fill(); }); ctx.globalAlpha=1; }
   // ponte em parábola: sai de uma pessoa, faz um arco e chega na outra
   const arc=(A,B)=>{ const mx=(A.x+B.x)/2,my=(A.y+B.y)/2, dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1; let nx=-dy/L, ny=dx/L; if(ny>0){nx=-nx;ny=-ny} const h=Math.min(L*0.38,260); return {cx:mx+nx*h, cy:my+ny*h, top:{x:0.25*A.x+0.5*(mx+nx*h)+0.25*B.x, y:0.25*A.y+0.5*(my+ny*h)+0.25*B.y}}; };
-  function draw(){
+  function draw(){ draw._lbl=[];
     if(!on) return;
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); hits=[]; sky();
     if(!fams.length){ ctx.fillStyle='#b9c3dc'; ctx.font='14px Inter,system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText('Cadastre pessoas na planta para ver os planetas.',W/2,H/2); return; }
@@ -1864,13 +1891,16 @@ const Planets=(()=>{
           ctx.globalAlpha=0.85*Math.min(1,e.front*1.5); ctx.fillStyle=tl; ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(e.p.x,e.p.y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
           const t=pt.target.name+' ›'; ctx.font='500 10px Inter,system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,.75)'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(t,e.p.x,e.p.y+r+3); ctx.globalAlpha=1;
           const tw=ctx.measureText(t).width; hits.push({type:'portal',pt,x:e.p.x,y:e.p.y+8,w:Math.max(tw,30)+10,h:36}); }); }
-      if(!showNames||sc<0.28){ ctx.font='600 15px Inter,system-ui,sans-serif'; ctx.fillStyle='#ffffff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=6;
+      // nomes que não se atropelam: se o lugar já tem um nome (de um planeta maior), este fica sem nome até aproximar
+      const ty0=C.y+rad+18; ctx.font='600 15px Inter,system-ui,sans-serif'; const lw=ctx.measureText(f.name).width+10, lr={x1:C.x-lw/2,x2:C.x+lw/2,y1:ty0-10,y2:ty0+28};
+      const livre=!(draw._lbl||[]).some(q=>lr.x1<q.x2&&lr.x2>q.x1&&lr.y1<q.y2&&lr.y2>q.y1);
+      if((!showNames||sc<0.28)&&livre){ (draw._lbl=draw._lbl||[]).push(lr); ctx.font='600 15px Inter,system-ui,sans-serif'; ctx.fillStyle='#ffffff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=6;
         const ty=showNames?C.y+rad+18:C.y+rad+18; ctx.fillText(f.name,C.x,ty); ctx.font='12px Inter,system-ui,sans-serif'; ctx.fillStyle='#b9c3dc'; ctx.fillText(f.blood.length+(f.blood.length===1?' pessoa':' pessoas'),C.x,ty+18); ctx.shadowBlur=0; }
       hits.push({type:'planet',f,x:C.x,y:C.y,r:rad});
     });
     bPts.forEach(({br,k})=>{ const mx=k.top.x,my=k.top.y; if(bigDiscs.some(d=>Math.hypot(mx-d.x,my-d.y)<d.r)) return;
       if(!pairMode){ ctx.fillStyle='rgba(20,26,51,.9)'; ctx.strokeStyle='#ffd68c'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(mx,my,12,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#ffd68c'; ctx.font='600 12px Inter,system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(br.pa.separated?'⚡':'♥',mx,my+0.5); hits.push({type:'bridge',br,x:mx,y:my,w:30,h:30}); return; }
-      const t=(br.pa.separated?'⚡ ':'♥ ')+call(br.pa)+' e '+call(br.pb)+(br.pa.separated?' (separados)':''); ctx.font='600 12px Inter,system-ui,sans-serif'; const tw=ctx.measureText(t).width+20;
+      const t=br.self?'👤 '+call(br.pa):(br.pa.separated?'⚡ ':'♥ ')+call(br.pa)+' e '+call(br.pb)+(br.pa.separated?' (separados)':''); ctx.font='600 12px Inter,system-ui,sans-serif'; const tw=ctx.measureText(t).width+20;
       ctx.fillStyle='rgba(20,26,51,.88)'; ctx.strokeStyle='#ffd68c'; ctx.lineWidth=1.2; rr(mx-tw/2,my-13,tw,26,13); ctx.fill(); ctx.stroke(); ctx.fillStyle='#ffe2a8'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(t,mx,my+0.5);
       hits.push({type:'bridge',br,x:mx,y:my,w:tw,h:26}); });
   }
@@ -1883,13 +1913,13 @@ const Planets=(()=>{
       draw(); if(k<1&&on) requestAnimationFrame(st); })(t0); }
   const spinTo=(f,person)=>{ const n=f.nodes.find(n=>n.p===person); if(!n) return {...f.spin}; const u=n.u; return {yaw:-Math.atan2(u[0],u[2]), pitch:Math.asin(Math.max(-1,Math.min(1,u[1])))}; };
   const info=t=>document.getElementById('pinfo').textContent=t;
-  function fitAll(){ pairMode=false; anim({T:[0,0,0],Z:Math.min(W,H)*0.44/ext()}); info('Sistema de famílias · toque num planeta ou numa ponte'); }
+  function fitAll(){ pairMode=false; anim({T:[0,0,0],Z:Math.min(W,H)*0.46/ext()}); info('Sistema de famílias · toque num planeta ou numa ponte'); }
   function flyFam(f,person){ pairMode=false; anim({T:f.c,Z:Math.min(W,H)*0.46/f.r,spins:person?[[f,spinTo(f,person)]]:[]}); info(f.name+' · arraste para girar o planeta'); }
   function flyBridge(br){ pairMode=true; highlight=new Set([br.pa.id,br.pb.id]);
     const mid=br.a.c.map((v,i)=>(v+br.b.c[i])/2), half=Math.hypot(...br.a.c.map((v,i)=>v-br.b.c[i]))/2, d=br.b.c.map((v,i)=>v-br.a.c[i]);
     let yaw,pitch,Z; if(H>W){ yaw=Math.atan2(-d[0],d[2]); pitch=Math.PI/2; Z=H*0.47/(half+Math.max(br.a.r,br.b.r)); } else { yaw=-Math.atan2(d[2],d[0]); pitch=0; Z=W*0.47/(half+Math.max(br.a.r,br.b.r)); }
     anim({T:mid,Z,yaw,pitch,spins:[[br.a,spinTo(br.a,br.pa)],[br.b,spinTo(br.b,br.pb)]]},800);
-    info('♥ '+call(br.pa)+' ('+br.a.name+') e '+call(br.pb)+' ('+br.b.name+')'); }
+    info(br.self ? '👤 '+call(br.pa)+': nasceu na '+br.a.name+' e formou a '+br.b.name : '♥ '+call(br.pa)+' ('+br.a.name+') e '+call(br.pb)+' ('+br.b.name+')'); }
   function focusPerson(id){ const p=byId(id); if(!p) return; const f=fams.find(f=>f.blood.includes(p))||fams.find(f=>f.visit.includes(p)); if(!f) return; highlight=new Set([id]); flyFam(f,p); showCard(id); }
   // cartão com a descrição: os nomes levam até a pessoa no planeta
   function showCard(id){ const p=byId(id), box=document.getElementById('pcard'); if(!p) return;
@@ -1932,13 +1962,15 @@ const Planets=(()=>{
   document.getElementById('pAll').onclick=()=>{ highlight=new Set(); hideCard(); fitAll(); };
   function startIdle(){ if(idleOn) return; idleOn=true; let last=performance.now();
     (function tick(t){ if(!on){idleOn=false;return} const dt=t-last; last=t; idle+=dt;
-      if(idle>2500 && cam.Z<=Math.min(W,H)*0.44/ext()*1.6 && !pairMode && !highlight.size && ptrs.size===0 && document.getElementById('pcard').hidden){ cam.yaw+=dt*0.00006; draw(); }
+      if(idle>2500 && cam.Z<=Math.min(W,H)*0.46/ext()*1.6 && !pairMode && !highlight.size && ptrs.size===0 && document.getElementById('pcard').hidden){ cam.yaw+=dt*0.00006; draw(); }
       requestAnimationFrame(tick); })(last); }
   ['pointerdown','wheel'].forEach(ev=>cv.addEventListener(ev,()=>{idle=0},{passive:true}));
   function resize(){ if(!on) return; dpr=window.devicePixelRatio||1; W=cv.clientWidth; H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; draw(); }
   window.addEventListener('resize',resize);
   return {
-    show(){ on=true; build(); resize(); startIdle(); if(!fitted&&fams.length){ cam.Z=Math.min(W,H)*0.44/ext(); fitted=true; info('Sistema de famílias · toque num planeta ou numa ponte'); } draw(); },
+    show(){ on=true; build(); resize(); startIdle(); if(!fitted&&fams.length){ cam.Z=Math.min(W,H)*0.46/ext(); fitted=true;
+        const eu=isOwner?DONO_ID:(myCad&&myCad.personId); const meu=eu&&(fams.find(f=>f.root.m.some(x=>x.id===eu))||fams.find(f=>f.kids&&f.kids.some(x=>x.id===eu)));
+        if(meu&&meu.c){ cam.T=[...meu.c]; cam.Z=Math.min(W,H)*0.46/Math.max(meu.r*3.2,meu.sys||meu.r); } info('Sistema de famílias · toque num planeta ou numa ponte'); } draw(); },
     hide(){ on=false; hideCard(); },
     refresh(){ if(on){ build(); draw(); const box=document.getElementById('pcard'); if(!box.hidden&&highlight.size===1) showCard([...highlight][0]); } },
     focusPerson, get on(){return on}
