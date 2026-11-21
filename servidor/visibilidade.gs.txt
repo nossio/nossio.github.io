@@ -294,8 +294,8 @@ function galaxia_(all, ja, sal) {
 // primeira fase: a teia de confiança. O dono está liberado; quem foi convidado por alguém liberado também fica liberado
 // (sem perguntas), e pode liberar quem ele convidar. No futuro: outro jeito.
 const DONO_ID = 'pmwgzm5c0b22l';
-function liberados_() { // personId de quem já está liberado (sem pedido pendente)
-  const s = new Set([DONO_ID]); cadastros_().forEach(c => { if (c.personId && !c.data.pend) s.add(c.personId); }); return s;
+function liberados_() { // personId de quem já está liberado (sem pedido pendente); o dono e a esposa dele são a raiz da confiança
+  const s = new Set([DONO_ID]); const dono = pessoas_().find(p => p.id === DONO_ID); if (dono && dono.data.spouse) s.add(dono.data.spouse); cadastros_().forEach(c => { if (c.personId && !c.data.pend) s.add(c.personId); }); return s;
 }
 function quemConvidou_(r, a) {
   const c = cadLinha_(r.code); if (!c) throw new Error('Complete o cadastro antes.');
