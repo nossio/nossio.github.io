@@ -73,6 +73,7 @@ h1 span{color:var(--green)}
 .av{width:64px;height:64px;border-radius:50%;margin:0 auto 8px;background:#eae2d2;display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-size:25px;color:var(--muted);overflow:hidden}
 .av img{width:100%;height:100%;object-fit:cover}
 .nm{font-size:16px;font-weight:600;line-height:1.2;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.4em}
+.ap{font-size:12px;color:var(--muted);font-style:italic;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .dt{font-size:13px;color:var(--muted);margin-top:3px;min-height:15px}
 .empty{max-width:420px;margin:30px auto;padding:0 20px;text-align:center}
 .empty h2{font-family:Fraunces,serif;font-size:22px}
@@ -140,7 +141,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1710';
+const APPVER='v20261121-1720';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -573,7 +574,7 @@ function renderPlanta(){
   let html=`<svg width="${maxX}" height="${maxY}">${lines}</svg>`;
   people.forEach((p,i)=>{const o=pos[p.id];if(!o)return;
     if(p.masked){ html+=`<div class="node masked" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}"><div class="av">?</div></div>`; return; }
-    html+=`<div class="node ${p.semNome?'semnome':''} ${i===0?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div><div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
+    html+=`<div class="node ${p.semNome?'semnome':''} ${i===0?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div>${p.apelido&&!p.unnamed&&norm(p.apelido)!==norm(first(p))&&/\s/.test((p.name||'').trim())?`<div class="ap">“${esc(p.apelido)}”</div>`:''}<div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
   tree.innerHTML=html;
   tree.querySelectorAll('.node').forEach(n=>n.onclick=()=>openPerson(n.dataset.id));
   if(focusId){const f=tree.querySelector(`.node[data-id="${focusId}"]`); if(f) f.classList.add('focus');}
@@ -1062,7 +1063,7 @@ const isBlockedLink=t=>/\b(namorad[oa]s?|namoro|noiv[oa]s?|noivado|amig[oa]s?|am
 // nome curto para as caixas: primeiro nome inteiro (composto também) + sobrenomes do meio abreviados + último sobrenome
 // sobrenome composto (com hífen, ex.: Souza-Lima) não é abreviado; "da", "de", "dos"… ficam como estão
 function shortName(p){
-  if(p.apelido) return p.apelido; if(p.unnamed) return p.name;
+  if(p.unnamed) return p.name; if(p.apelido&&!/\s/.test((p.name||'').trim())) return p.apelido;
   const w=(p.name||'').trim().split(/\s+/), f=first(p).split(' ').length;
   if(w.length-f<2) return p.name;
   const mid=w.slice(f,-1).map(x=>PART.has(norm(x))||x.includes('-')?x:x.charAt(0)+'.');
