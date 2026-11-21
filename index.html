@@ -139,7 +139,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1430';
+const APPVER='v20261121-1440';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -789,8 +789,8 @@ function showGate(){ document.body.classList.add('gated'); setStatus(''); cadWho
     if(g('gCid').length<2) return err('Informe a cidade onde você mora.');
     const btn=document.getElementById('gGo'); btn.disabled=true; btn.textContent='Entrando…';
     const data={nome,cpf:'',cidade:g('gCid'),naturalidade:g('gNat'),nascimento:g('gNasc'),mae:'',pai:'',apelido:'',aceite:true,aceiteRegras:Date.now(),sexo:'',personId:null,atualizado:Date.now()};
-    try{ await db.collection('cadastro').doc(myId).set(data); myCad=data; askHow(); }
-    catch(e){ btn.disabled=false; btn.textContent='Concordo e quero entrar'; err('Não foi possível entrar agora. Tente de novo.'); } };
+    try{ try{ await db.collection('cadastro').doc(myId).set(data); }catch(e1){ await new Promise(r=>setTimeout(r,2500)); await db.collection('cadastro').doc(myId).set(data); } myCad=data; askHow(); }
+    catch(e){ btn.disabled=false; btn.textContent='Concordo e quero entrar'; err('Não foi possível entrar agora. Tente de novo em alguns segundos.'+(e&&e.message&&e.message!=='erro'?' ('+e.message+')':'')); } };
 }
 function unGate(){ document.body.classList.remove('gated'); closeSheet(); }
 /* ---------- depois do cadastro: como a pessoa chegou (sem mostrar ninguém da árvore) ---------- */
