@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2210';
+const APPVER='v20261121-2220';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -487,7 +487,12 @@ function layout(){
     addRoot(found.r,found.side,found.anchor,found.friend);
   }
   // deslocamento escolhido pelo usuário (setas "mover a família"): cada toque anda a largura de um cartão
-  if(!window.__root) blocks.forEach(({r,S})=>{ const dx=r.m.reduce((a,m)=>a+(m.dx||0),0); if(dx) S.n.forEach(o=>o.x+=dx*W); }); // ajuste manual só no "ver todos"
+  if(!window.__root) blocks.forEach(({r,S})=>{ const dx=r.m.reduce((a,m)=>a+(m.dx||0),0); if(!dx) return; const ids=new Set(S.n.map(o=>o.id));
+    // só aplica o ajuste manual se a família não cair em cima de outra
+    const livre=S.n.every(o=>!F.n.some(q=>!ids.has(q.id)&&q.g===o.g&&Math.abs(q.x-(o.x+dx*W))<W*0.98)); if(livre) S.n.forEach(o=>o.x+=dx*W); }); // ajuste manual só no "ver todos"
+  { // segurança final: nenhum cartão em cima de outro na mesma linha
+    const porG={}; F.n.forEach(o=>(porG[o.g]=porG[o.g]||[]).push(o));
+    Object.values(porG).forEach(l=>{ l.sort((a,b)=>a.x-b.x); for(let i=1;i<l.length;i++) if(l[i].x<l[i-1].x+W) l[i].x=l[i-1].x+W; }); }
   const minX=Math.min(...F.n.map(o=>o.x));
   const pos={}; F.n.forEach(o=>pos[o.id]={x:o.x-minX,y:gIdx[o.g]*H});
   return {pos};
