@@ -143,9 +143,16 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2130';
-(async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
-  if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
+const APPVER='v20261121-2140';
+const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
+  if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
+  // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
+  const ab=document.getElementById('sheet'); if(ab&&ab.classList.contains('on')) return;
+  sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); }catch(e){} };
+checaVersao();
+// versão nova também chega com a página aberta: confere ao voltar para a aba e a cada 3 minutos
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checaVersao(); });
+setInterval(checaVersao,180000);
 const CODEKEY='nossio-code'; let MEMCODE='';
 const LSget=k=>{try{return localStorage.getItem(k)}catch(e){return k===CODEKEY?MEMCODE:null}}, LSset=(k,v)=>{if(k===CODEKEY)MEMCODE=v; try{localStorage.setItem(k,v)}catch(e){}}, LSdel=k=>{if(k===CODEKEY)MEMCODE=''; try{localStorage.removeItem(k)}catch(e){}};
 const API='https://script.google.com/macros/s/AKfycbwcTs1peEwuO-V6V8xegz2Wod2MTj91sXOXKCrycDWgBuFiNZTsaJZWupC_0t2DZJVGtA/exec';
