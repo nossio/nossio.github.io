@@ -48,6 +48,7 @@ function vincular_(r, a) {
   if (cad.personId && byId[cad.personId]) throw new Error('Você já está ligado(a) à árvore.');
   if (rel === 'eu' && aba_('cadastro').getDataRange().getValues().slice(1).some(x => String(x[11]) === String(a.to))) throw new Error('Essa pessoa já tem cadastro próprio.');
   let meId;
+  if (a.convite && !liberados_().has(a.to)) a.convite = false; // convite só vale de quem já está liberado
   const pendente = ['eu', 'filho', 'irmao', 'conjuge'].includes(rel) && !a.convite && !cad.convidadoPorDono;
   if (pendente) cad.pend = { to: a.to, toNome: to.name, rel, em: Date.now(), confirmadoPor: [], indicados: [] };
   if (rel === 'eu') {
@@ -67,7 +68,7 @@ function vincular_(r, a) {
       to.parents = [to.father, to.mother].filter(Boolean); salvarPessoa_(a.to, to);
     }
     // quem veio por convite já está confirmado por quem convidou
-    else if (rel === 'amigo' || rel === 'namorado') { const lib = !!a.convite || (!!cad.convidadoPorDono && a.to === DONO_ID); me.links = [{ type: rel, to: a.to, confirmado: lib, convite: !!a.convite }]; }
+    else if (rel === 'amigo' || rel === 'namorado') { const lib = !!a.convite || (!!cad.convidadoPorDono && a.to === cad.convidadoPorId); me.links = [{ type: rel, to: a.to, confirmado: lib, convite: !!a.convite }]; }
     me.parents = [me.father, me.mother].filter(Boolean);
     salvarPessoa_(meId, me);
   }
@@ -288,13 +289,18 @@ function galaxia_(all, ja, sal) {
     return { id: x(p.id), data: { name: '', sex: '', father: f, mother: m, parents: [f, m].filter(Boolean), spouse: x(d.spouse), createdAt: 0, masked: true, fora: true } }; });
 }
 
-// por enquanto: quem diz que foi convidado pelo dono entra liberado, sem confirmação
+// primeira fase: a teia de confiança. O dono está liberado; quem foi convidado por alguém liberado também fica liberado
+// (sem perguntas), e pode liberar quem ele convidar. No futuro: outro jeito.
 const DONO_ID = 'pmwgzm5c0b22l';
+function liberados_() { // personId de quem já está liberado (sem pedido pendente)
+  const s = new Set([DONO_ID]); cadastros_().forEach(c => { if (c.personId && !c.data.pend) s.add(c.personId); }); return s;
+}
 function quemConvidou_(r, a) {
   const c = cadLinha_(r.code); if (!c) throw new Error('Complete o cadastro antes.');
-  const dono = pessoas_().find(p => p.id === DONO_ID); const q = norm_(a && a.nome);
-  const ok = !!(dono && q && (buscar_([dono], a.nome).length || norm_(dono.data.apelido) === q));
-  c.data.convidadoPor = String(a && a.nome || '').slice(0, 80); c.data.convidadoPorDono = ok;
+  const nome = String(a && a.nome || '').slice(0, 80), lib = liberados_();
+  const cands = pessoas_().filter(p => lib.has(p.id) && p.id !== c.data.personId);
+  const q = norm_(nome), achou = q ? (buscar_(cands, nome)[0] || cands.find(p => norm_(p.data.apelido) === q)) : null;
+  c.data.convidadoPor = nome; c.data.convidadoPorId = achou ? achou.id : null; c.data.convidadoPorDono = !!achou;
   aba_('cadastro').getRange(c.row, 14).setValue(JSON.stringify(c.data));
-  return { dono: ok };
+  return { dono: !!achou, nome: achou ? (achou.name || (achou.data && achou.data.name)) : '' };
 }
