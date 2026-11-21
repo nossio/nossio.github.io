@@ -140,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1600';
+const APPVER='v20261121-1610';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -335,6 +335,16 @@ async function sortByAge(id){
   sib.sort((a,b)=>{ if(a.birth&&b.birth) return a.birth<b.birth?-1:a.birth>b.birth?1:0; if(a.birth) return -1; if(b.birth) return 1; return (a.order??99)-(b.order??99); });
   try{ await saveOrder(sib); toast('Irmãos em ordem de idade'+(sib.some(x=>!x.birth)?' — quem não tem data ficou no fim':'')); openPerson(id);}catch(e){}
 }
+
+// casal com os pais dos dois lados na árvore: fica do lado mais perto de quem está olhando (para o dono, o do marido)
+function viewerDist(){ const me=(!isOwner&&myCad&&myCad.personId)?myCad.personId:null; if(!me||!byId(me)) return null;
+  if(viewerDist._k===me+'|'+people.length) return viewerDist._d;
+  const d={[me]:0}, q=[me], kids={}; people.forEach(p=>[p.father,p.mother].forEach(x=>{ if(x)(kids[x]=kids[x]||[]).push(p.id); }));
+  while(q.length){ const x=q.shift(), p=byId(x); if(!p) continue; [p.father,p.mother,p.spouse,...(kids[x]||[])].forEach(y=>{ if(y&&d[y]===undefined&&byId(y)){ d[y]=d[x]+1; q.push(y); } }); }
+  viewerDist._k=me+'|'+people.length; viewerDist._d=d; return d; }
+function pickAnchor(c){ if(c.length<2) return c[0]||null; const d=viewerDist();
+  if(d){ const pd=x=>Math.min(...[x.father,x.mother].map(y=>d[y]??1e9)); const a=pd(c[0]), b=pd(c[1]); if(a!==b) return a<b?c[0]:c[1]; }
+  return c.find(x=>x.sex==='M')||c[0]; }
 function layout(){
   const gen={}; if(!people.length) return {pos:{}};
   const q=[];
@@ -360,7 +370,7 @@ function layout(){
   const hasPar=x=>!!((x.father&&byId(x.father))||(x.mother&&byId(x.mother)));
   // a unidade fica embaixo dos pais de um dos dois ("âncora"); se os dois têm pais na árvore, do marido
   units.forEach(u=>{ const c=u.m.filter(hasPar);
-    u.anchor = c.length===2 ? (c.find(x=>x.sex==='M')||c[0]) : c[0]||null;
+    u.anchor = pickAnchor(c);
     u.foreign = u.anchor ? u.m.find(x=>x!==u.anchor && hasPar(x))||null : null; // cônjuge que tem a família dele na árvore
     const a=u.anchor; u.parent = a ? (unitOf[a.father]||unitOf[a.mother]||null) : null; });
   // evita ciclo em dados estranhos
@@ -1709,7 +1719,7 @@ const Planets=(()=>{
     const U={}, units=[];
     [...ALL].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).forEach(p=>{ if(U[p.id]) return; const sp=p.spouse&&by(p.spouse); const u={m:[p],kids:[]}; if(sp&&!U[sp.id]) u.m.push(sp); u.m.forEach(x=>U[x.id]=u); units.push(u); });
     const hp=x=>!!((x.father&&by(x.father))||(x.mother&&by(x.mother)));
-    units.forEach(u=>{ const c=u.m.filter(hp); u.anchor=c.length===2?(c.find(x=>x.sex==='M')||c[0]):c[0]||null; u.foreign=u.anchor?u.m.find(x=>x!==u.anchor&&hp(x))||null:null; u.parent=u.anchor?(U[u.anchor.father]||U[u.anchor.mother]||null):null; });
+    units.forEach(u=>{ const c=u.m.filter(hp); u.anchor=pickAnchor(c); u.foreign=u.anchor?u.m.find(x=>x!==u.anchor&&hp(x))||null:null; u.parent=u.anchor?(U[u.anchor.father]||U[u.anchor.mother]||null):null; });
     units.forEach(u=>{ let v=u.parent,n=0; while(v&&n++<200){ if(v===u){u.parent=null;break} v=v.parent; } });
     units.forEach(u=>{ if(u.parent) u.parent.kids.push(u); });
     const topU=u=>{let v=u,n=0;while(v.parent&&n++<200)v=v.parent;return v};
