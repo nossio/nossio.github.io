@@ -65,6 +65,7 @@ h1 span{color:var(--green)}
 @keyframes pulse{50%{transform:scale(1.08)}}
 .findList{max-height:55vh;overflow:auto}.findItem{display:block;width:100%;text-align:left;padding:11px 10px;border:0;border-bottom:1px solid #eee5d4;background:none;font:inherit;font-size:15px;cursor:pointer}.findItem small{color:var(--muted);display:block;font-size:12px}
 .node.prov{border-style:dashed;border-color:var(--amber)}
+.node.semnome::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:linear-gradient(to top right,transparent calc(50% - 1.5px),rgba(176,80,80,.28) calc(50% - 1.5px),rgba(176,80,80,.28) calc(50% + 1.5px),transparent calc(50% + 1.5px)),linear-gradient(to bottom right,transparent calc(50% - 1.5px),rgba(176,80,80,.28) calc(50% - 1.5px),rgba(176,80,80,.28) calc(50% + 1.5px),transparent calc(50% + 1.5px))}
 .node.masked{background:#ece5d6;border-style:dashed;opacity:.7}.node.masked .av{background:#ddd3bf;color:#9c8f76}
 .node.prov .nm{font-style:italic;color:#6b5a3a}
 .chip{display:inline-block;font-size:10px;padding:2px 6px;border-radius:8px;margin-top:4px;background:var(--amber-soft);color:var(--amber);font-weight:600}
@@ -139,7 +140,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1445';
+const APPVER='v20261121-1450';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -531,7 +532,7 @@ function renderPlanta(){
   let html=`<svg width="${maxX}" height="${maxY}">${lines}</svg>`;
   people.forEach((p,i)=>{const o=pos[p.id];if(!o)return;
     if(p.masked){ html+=`<div class="node masked" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}"><div class="av">?</div></div>`; return; }
-    html+=`<div class="node ${i===0?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${p.semNome?'🙈 ':''}${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div><div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
+    html+=`<div class="node ${p.semNome?'semnome':''} ${i===0?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div><div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
   tree.innerHTML=html;
   tree.querySelectorAll('.node').forEach(n=>n.onclick=()=>openPerson(n.dataset.id));
   if(focusId){const f=tree.querySelector(`.node[data-id="${focusId}"]`); if(f) f.classList.add('focus');}
