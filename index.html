@@ -120,6 +120,7 @@ a.pl{color:var(--green);font-weight:600;text-decoration:none;border-bottom:1px d
 body.gated header,body.gated #wrap,body.gated #status,body.gated .zoomCtl,body.gated #zoomCtl{visibility:hidden}
 body.gated #scrim{background:#f5efe3;opacity:1;pointer-events:none}
 body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
+.bnconv{position:fixed;left:12px;right:12px;bottom:14px;z-index:40;background:#fffdf7;border:1.5px solid var(--line);border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:12px 14px;max-width:520px;margin:0 auto}.bnconv .bt{font-size:15px;margin-bottom:8px}.bnconv .bb{display:flex;gap:8px}.bnconv .bb .btn{flex:1;padding:10px}.bnconv.min .bt{display:none}
 .regras{margin-top:14px;padding:10px 12px;background:#efe7d6;border-radius:10px;font-size:13px;line-height:1.4}.regras ul{margin:6px 0 0 18px;padding:0}.regras li{margin:3px 0}
 </style>
 </head>
@@ -142,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2010';
+const APPVER='v20261121-2030';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -575,7 +576,7 @@ function renderPlanta(){
   let html=`<svg width="${maxX}" height="${maxY}">${lines}</svg>`;
   people.forEach((p,i)=>{const o=pos[p.id];if(!o)return;
     if(p.masked){ html+=`<div class="node masked" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}"><div class="av">?</div></div>`; return; }
-    html+=`<div class="node ${p.semNome?'semnome':''} ${i===0?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div>${p.apelido&&!p.unnamed&&norm(p.apelido)!==norm(first(p))&&/\s/.test((p.name||'').trim())?`<div class="ap">“${esc(p.apelido)}”</div>`:''}<div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
+    html+=`<div class="node ${p.semNome?'semnome':''} ${(window.__root?p.id===window.__root:i===0)?'root':''} ${p.deceased?'dead':isMinor(p)?'minor':''} ${isProv(p)?'prov':''}" style="left:${o.x}px;top:${o.y}px" data-id="${p.id}">${avatar(p)}<div class="nm">${esc(shortName(p))}${p.deceased?' <span title="falecido(a)">†</span>':''}</div>${p.apelido&&!p.unnamed&&norm(p.apelido)!==norm(first(p))&&/\s/.test((p.name||'').trim())?`<div class="ap">“${esc(p.apelido)}”</div>`:''}<div class="dt">${esc(lifeLine(p))}</div>${isProv(p)?'<span class="chip">a confirmar</span>':''}</div>`});
   tree.innerHTML=html;
   tree.querySelectorAll('.node').forEach(n=>n.onclick=()=>openPerson(n.dataset.id));
   if(focusId){const f=tree.querySelector(`.node[data-id="${focusId}"]`); if(f) f.classList.add('focus');}
@@ -822,7 +823,7 @@ const REGRAS=`<div class="regras"><b>Regras do Nossio</b><ul>
   <li>O Nossio segue as leis do Brasil e cumpre as requisições de autoridades competentes, na forma da lei.</li></ul></div>`;
 function showGate(){ document.body.classList.add('gated'); setStatus(''); cadWho=null;
   openSheet(`<h1 style="font-size:34px;margin:4px 0 6px">Nossi<span>o</span></h1>
-  <div class="sub" style="font-size:15px">Uma grande árvore que liga famílias. Conte quem você é para entrar — leva 30 segundos.</div>
+  <div class="sub" style="font-size:15px;line-height:1.45">O <b>Nossio</b> é uma árvore genealógica feita pelas próprias famílias. Cada um coloca os seus — pais, filhos, irmãos, avós — e as famílias vão se ligando. A ideia é que, daqui a muitos anos, seus netos saibam de onde vieram.<br><br>Conte quem você é para entrar — leva 30 segundos.</div>
   <label class="lbl gq">Qual o seu nome completo?</label><input id="gNome" class="inp cad" autocomplete="name">
   <label class="lbl gq">Qual a sua data de nascimento?</label><input id="gNasc" class="inp cad" type="date">
   <label class="lbl gq">Em que cidade você nasceu?</label><input id="gNat" class="inp cad" placeholder="Ex.: Montes Claros - MG">
@@ -940,6 +941,9 @@ async function doLink(a,nome){
   LSdel(CONVKEY); ME=null; unGate(); await init();
   if(['eu','filho','irmao','conjuge'].includes(a.rel)&&!a.convite&&!window.__porDono) return showWait(nome);
   const pend=(a.rel==='namorado'||a.rel==='amigo')&&!a.convite;
+  // primeiro a pessoa vê a árvore; o convite fica num aviso pequeno embaixo, que não tapa nada
+  closeSheet(); userMoved=false; render();
+  return bannerConvite(pend?`❤️ Pedido enviado: vocês aparecem ligados quando ${esc(nome.split(' ')[0])} aceitar.`:a.rel==='conhecer'?'🌱 Sua árvore começou! Inclua seus parentes em ➕ Incluir.':'🎉 Pronto! Esta é a sua árvore: você está no centro, com seus pais, irmãos, filhos e primos. Toque em qualquer pessoa para ver mais. Em 🪐 você vê todas as famílias.');
   showInvite(pend?`<h2>Pedido enviado ❤️</h2><div class="sub">Vocês vão aparecer ligados quando <b>${esc(nome)}</b> aceitar. Mande o link para ${esc(nome)} entrar no Nossio e confirmar:</div>`
     : a.rel==='conhecer'?`<h2>Sua árvore começou! 🌱</h2><div class="sub">Agora é só incluir os seus parentes em <b>➕ Incluir</b>. E chame quem você quiser — mande este link:</div>`
     : `<h2>Pronto! 🎉</h2><div class="sub">Você já está na árvore. Inclua quem estiver faltando em <b>➕ Incluir</b> e chame a família — mande este link:</div>`);
@@ -997,6 +1001,11 @@ async function openPrivacy(){ let pv={oculto:'',bloqueados:[]}; try{ pv=await ga
     document.getElementById('sS').onclick=async()=>{ try{ await gas('sair'); }catch(e){ return toast('Não foi possível agora'); } LSdel(CODEKEY); document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;text-align:center;font-family:Inter,system-ui,sans-serif;background:#f5efe3"><p style="font-size:17px">Pronto. Você saiu do Nossio.<br>Obrigado!</p></div>'; }; };
 }
 async function hideFrom(p){ try{ await gas('privacidade',{bloquear:p.id}); toast(call(p)+' não vê mais você'); }catch(e){ toast('Não foi possível'); } closeSheet(); }
+function bannerConvite(txt){ let b=document.getElementById('bnConv'); if(b) b.remove();
+  b=document.createElement('div'); b.id='bnConv'; b.className='bnconv';
+  b.innerHTML=`<div class="bt">${txt}</div><div class="bb"><button class="btn green" id="bnInv">💌 Chamar alguém</button><button class="btn ghost" id="bnX">Fechar</button></div>`;
+  document.body.appendChild(b); document.getElementById('bnX').onclick=()=>b.remove(); document.getElementById('bnInv').onclick=()=>{ b.remove(); showInvite(); };
+  setTimeout(()=>{ const x=document.getElementById('bnConv'); if(x) x.classList.add('min'); },25000); }
 function inviteUrl(){ const pid=myCad&&myCad.personId||(ME&&ME.cad&&ME.cad.personId); return location.origin+location.pathname+(pid&&!isOwner?'?de='+encodeURIComponent(pid):''); }
 async function showInvite(head){ if(!myCad||!myCad.personId){ try{ ME=null; const m=await meP(); if(m.cad) myCad=m.cad; }catch(e){} }
   const u=inviteUrl(), msg='Entre no Nossio, uma árvore que liga famílias: '+u;
