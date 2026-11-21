@@ -141,7 +141,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-1730';
+const APPVER='v20261121-1740';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1765,7 +1765,10 @@ const Planets=(()=>{
       }); }
     fams.forEach(f=>{ const cnt={}; f.blood.filter(p=>!p.unnamed&&!(f.extra&&f.extra.has(p.id))).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; cnt[l]=(cnt[l]||0)+1}});
       const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; const lead=f.blood.filter(p=>!p.unnamed&&!p.masked&&!(f.extra&&f.extra.has(p.id))).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0];
-      f.name= best&&best[1]>=2?'Família '+best[0]:lead?'Família de '+call(lead):'Família'; });
+      f.name= best&&best[1]>=2?'Família '+best[0]:lead?'Família de '+call(lead):'Família';
+      // quem entrou pelo sangue de outra família (ex.: filhos da Terezinha no planeta Rocha) dá o segundo nome: Rocha/Ferreira
+      if(best&&best[1]>=2&&f.extra&&f.extra.size){ const c2={}; f.blood.filter(p=>f.extra.has(p.id)&&!p.unnamed&&!p.masked).forEach(p=>{const w=p.name.trim().split(/\s+/); if(w.length>1){const l=w[w.length-1]; if(l!==best[0]) c2[l]=(c2[l]||0)+1}});
+        const b2=Object.entries(c2).sort((a,b)=>b[1]-a[1])[0]; if(b2&&b2[1]>=2) f.name='Família '+best[0]+'/'+b2[0]; } });
     bridges=[];
     units.forEach(u=>{ if(!u.foreign) return; const a=fams.find(f=>f.root===topU(u)), b=fams.find(f=>f.root===topU(U[u.foreign.father]||U[u.foreign.mother])); if(a&&b&&a!==b) bridges.push({a,b,pa:u.anchor,pb:u.foreign}); });
     // cada família desenhada como na planta e enrolada na esfera
