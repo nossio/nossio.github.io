@@ -132,7 +132,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 <div class="treewrap" id="wrap"><div id="zoomBox"><div class="tree" id="tree"></div></div><div id="emptyBox"></div></div>
 <div id="pinfo" hidden></div><canvas id="pcv" hidden></canvas>
 <div class="pcard" id="pcard" hidden></div>
-<div class="pctl" id="pctl" hidden><button id="pIn" aria-label="Aproximar">+</button><button id="pOut" aria-label="Afastar">−</button><button id="pAll" aria-label="Ver todos">TODOS</button><button id="pRng" aria-label="Alcance">FAMÍLIAS</button></div>
+<div class="pctl" id="pctl" hidden><button id="pIn" aria-label="Aproximar">+</button><button id="pOut" aria-label="Afastar">−</button><button id="pAll" aria-label="Ver todos">TODOS</button><button id="pRng" aria-label="Alcance">FAMÍLIAS</button><button id="pRotL" aria-label="Girar para a esquerda">⟲</button><button id="pRotR" aria-label="Girar para a direita">⟳</button><button id="pNorte" aria-label="Voltar ao norte">N</button></div>
 <div class="zoomCtl" id="zoomCtl" hidden><button id="zOut" aria-label="Diminuir">−</button><button id="zPct" aria-label="Ajustar à tela">100%</button><button id="zIn" aria-label="Aumentar">+</button></div>
 <button class="btn green fab" id="fab" hidden>+ Incluir pessoa</button>
 <div class="scrim" id="scrim"></div>
@@ -143,7 +143,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261121-2050';
+const APPVER='v20261121-2100';
 (async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(m&&m[1]!==APPVER&&sessionStorage.getItem('nossio-rl')!==m[1]){ sessionStorage.setItem('nossio-rl',m[1]); location.replace(location.pathname+'?nv='+m[1]+location.hash); } }catch(e){} })();
 const CODEKEY='nossio-code'; let MEMCODE='';
@@ -1963,14 +1963,14 @@ const Planets=(()=>{
   const planetAt=(x,y)=>hits.filter(h=>h.type==='planet').sort((a,b)=>b.r-a.r).find(h=>Math.hypot(x-h.x,y-h.y)<h.r);
   cv.addEventListener('pointerdown',e=>{ cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=false;
     const r=cv.getBoundingClientRect();
-    if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),Z:cam.Z}; drag=null; return; }
-    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= e.button!==1&&pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===2||e.shiftKey}; });
+    if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),Z:cam.Z,ang:Math.atan2(b.y-a.y,b.x-a.x),yaw:cam.yaw,my:(a.y+b.y)/2,pitch:cam.pitch}; drag=null; return; }
+    const pl=planetAt(e.clientX-r.left,e.clientY-r.top); target= e.button!==1&&pl&&pl.r>Math.min(W,H)*0.28 ? pl.f : null; drag={x:e.clientX,y:e.clientY,gira:e.button===2||e.shiftKey||e.ctrlKey||e.altKey}; if(drag.gira) target=null; });
   cv.addEventListener('contextmenu',e=>e.preventDefault()); cv.addEventListener('mousedown',e=>{ if(e.button===1) e.preventDefault(); });
   cv.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(pinch&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; cam.Z=Math.max(0.002,Math.min(80,pinch.Z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d)); moved=true; draw(); return; }
+    if(pinch&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; cam.Z=Math.max(0.002,Math.min(80,pinch.Z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d)); cam.yaw=pinch.yaw-(Math.atan2(b.y-a.y,b.x-a.x)-pinch.ang); cam.pitch=Math.max(-1.55,Math.min(-0.05,pinch.pitch+(((a.y+b.y)/2)-pinch.my)*0.005)); moved=true; draw(); return; }
     if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>4) moved=true;
     if(target){ const k=1/(target.r*cam.Z); target.spin.yaw+=dx*k; target.spin.pitch=Math.max(-1.3,Math.min(1.3,target.spin.pitch-dy*k)); }
-    else if(drag.gira){ cam.yaw+=dx*0.006; cam.pitch=Math.max(-1.6,Math.min(1.6,cam.pitch-dy*0.006)); }
+    else if(drag.gira){ cam.yaw-=dx*0.006; cam.pitch=Math.max(-1.55,Math.min(-0.05,cam.pitch+dy*0.005)); idle=0; }
     else { // arrastar o espaço desloca o conjunto (direita/esquerda, cima/baixo); botão direito ou Shift gira
       const X=dx/cam.Z, Y=dy/cam.Z, cy=Math.cos(cam.yaw), sy=Math.sin(cam.yaw), sp=Math.sin(cam.pitch); const zr=Math.abs(sp)>0.15?-Y/sp:0;
       cam.T=[cam.T[0]-(X*cy-zr*sy),cam.T[1]-(Math.abs(sp)>0.15?0:Y),cam.T[2]-(X*sy+zr*cy)]; idle=0; }
@@ -1998,6 +1998,9 @@ const Planets=(()=>{
   document.getElementById('pIn').onclick=()=>anim({Z:Math.min(80,cam.Z*1.4)},250);
   document.getElementById('pOut').onclick=()=>anim({Z:Math.max(0.002,cam.Z/1.4)},250);
   document.getElementById('pAll').onclick=()=>{ highlight=new Set(); hideCard(); fitAll(); };
+  document.getElementById('pRotL').onclick=()=>anim({yaw:cam.yaw+Math.PI/8},300);
+  document.getElementById('pRotR').onclick=()=>anim({yaw:cam.yaw-Math.PI/8},300);
+  document.getElementById('pNorte').onclick=()=>anim({yaw:0.6,pitch:-0.7},400);
   // alcance, como no GPS de aviação: Galáxia (só os sóis) → Famílias (planetas e luas) → Pessoas (fichas com nome)
   document.getElementById('pRng').onclick=()=>{ const L=['galaxia','familias','pessoas'], N={galaxia:'GALÁXIA',familias:'FAMÍLIAS',pessoas:'PESSOAS'};
     alcance=L[(L.indexOf(alcance)+1)%L.length]; document.getElementById('pRng').textContent=N[alcance]; idle=0;
