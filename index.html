@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261122-1310';
+const APPVER='v20261122-1330';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1176,7 +1176,7 @@ function openPerson(id){
     ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
     ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
-  if(canWrite) h+=`<button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button><button class="btn green" id="bLink">🔗 Ligar a alguém da árvore</button><button class="btn ghost" id="bEdit">Editar</button>`;
+  if(canWrite) h+=`<button class="btn green" id="bEdit">✏️ Corrigir dados</button><button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
   if(canWrite && !window.__root && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
@@ -2072,11 +2072,12 @@ const Planets=(()=>{
       <div class="sub" style="margin:0">${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>
       <div class="desc">${describe(p)}</div>
       ${(p.notes||[]).length?'<div class="sub" style="margin:0 0 8px">'+p.notes.map(n=>esc(n.t)).join(' · ')+'</div>':''}
-      <div class="row"><button class="btn green" id="pcF">Ver ficha</button></div>`;
+      <div class="row">${canWrite?'<button class="btn green" id="pcE">✏️ Corrigir</button><button class="btn green" id="pcL">🔗 Ligar a parente</button>':''}<button class="btn ghost" id="pcF">Ver ficha</button></div>`;
     box.hidden=false;
     box.querySelectorAll('a[data-go]').forEach(a=>a.onclick=e=>{e.preventDefault(); focusPerson(a.dataset.go);});
     document.getElementById('pcX').onclick=()=>{box.hidden=true;};
-    document.getElementById('pcF').onclick=()=>openPerson(id); }
+    document.getElementById('pcF').onclick=()=>openPerson(id);
+    if(canWrite){ document.getElementById('pcE').onclick=()=>openForm(id,'edit'); document.getElementById('pcL').onclick=()=>openAcrescentar(id); } }
   const hideCard=()=>{ document.getElementById('pcard').hidden=true; };
   // gestos: de longe gira o sistema; de perto gira o planeta
   const ptrs=new Map(); let drag=null,pinch=null,moved=false,target=null;
