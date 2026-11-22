@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261122-1240';
+const APPVER='v20261122-1300';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -540,7 +540,7 @@ function render(){
 }
 function renderPlanta(){
   const tree=document.getElementById('tree'), empty=document.getElementById('emptyBox'), fab=document.getElementById('fab');
-  fab.hidden = true; const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = !isOwner || pendM || !((askReady||window.NOSSIO_GAS) && people.length>=1);
+  fab.hidden = true; const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = true; // Contar aposentado: tudo pelo ➕ Acrescentar
   if(!people.length){
     tree.innerHTML=''; tree.style.width=tree.style.height='0'; treeW=treeH=0; applyScale(); document.getElementById('zoomCtl').hidden=true;
     empty.innerHTML = canWrite ? `<div class="empty"><h2>Vamos começar por você</h2><p>Cadastre-se primeiro. Depois toque em qualquer pessoa da árvore para incluir pais, filhos, irmãos e cônjuge.</p><button class="btn green" id="startBtn">Cadastrar-me</button></div>` : `<div class="empty"><p>A árvore ainda está vazia.</p></div>`;
@@ -1194,7 +1194,7 @@ function openPerson(id){
     document.getElementById('bLink').onclick=()=>openAcrescentar(id); window.__linkVelho=()=>{openForm(id,'edit');setTimeout(()=>{const b=document.getElementById('relBox');b.closest('.field').scrollIntoView({block:'center'});b.closest('.field').style.background='var(--amber-soft)';b.closest('.field').style.borderRadius='10px';b.closest('.field').style.padding='8px'},250)};
     document.getElementById('noteAdd').onclick=async()=>{const t=document.getElementById('noteIn').value.trim();if(!t)return;
       // se a frase muda a árvore (faleceu, filho de, casado com…), vai para o Contar em vez de virar só observação
-      if(isOwner&&canWrite&&typeof parseConta==='function'){ const ok=x=>{const a=parseConta(x); return a.length&&a.some(y=>y.t!=='?');};
+      if(false&&typeof parseConta==='function'){ const ok=x=>{const a=parseConta(x); return a.length&&a.some(y=>y.t!=='?');};
         const cand=ok(t)?t:ok(call(p)+' '+t)?call(p)+' '+t:null; if(cand){ openTell(cand); return; } }
       p.notes=[...(p.notes||[]),{t,at:new Date().toISOString().slice(0,10),by:(typeof myName==='function'?myName():'')}];
       try{await savePerson(p);openPerson(id);toast('Informação registrada')}catch(e){}};
