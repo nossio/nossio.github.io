@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261122-1300';
+const APPVER='v20261122-1310';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -522,7 +522,7 @@ function circleOf(f){
 }
 function verArvoreDe(id){ treeRoot=id; verTodos=false; userMoved=false; closeSheet(); if(typeof viewMode!=='undefined'&&viewMode==='plan'){ document.getElementById('vTree').click(); } render(); }
 function render(){
-  if(typeof viewMode!=='undefined' && viewMode==='plan'){ Planets.refresh(); return; }
+  if(typeof viewMode!=='undefined' && viewMode==='plan'){ try{atualizaBotoes();}catch(e){} Planets.refresh(); return; }
   if(isOwner&&!window.__vtIni){ window.__vtIni=true; verTodos=true; } // o dono abre vendo o mundo todo
   const all=people; let base=all.filter(p=>!p.fora);
   const r=(!verTodos)&&(()=>{ const pp=people; people=base; try{ return currentRoot(); } finally{ people=pp; } })();
@@ -538,9 +538,10 @@ function render(){
     const b=document.getElementById('stAll'); if(b) b.onclick=e=>{ e.preventDefault(); verTodos=true; userMoved=false; render(); };
   }
 }
+function atualizaBotoes(){ const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = true; /* Contar aposentado: tudo pelo ➕ Acrescentar */ }
 function renderPlanta(){
   const tree=document.getElementById('tree'), empty=document.getElementById('emptyBox'), fab=document.getElementById('fab');
-  fab.hidden = true; const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = true; // Contar aposentado: tudo pelo ➕ Acrescentar
+  fab.hidden = true; atualizaBotoes();
   if(!people.length){
     tree.innerHTML=''; tree.style.width=tree.style.height='0'; treeW=treeH=0; applyScale(); document.getElementById('zoomCtl').hidden=true;
     empty.innerHTML = canWrite ? `<div class="empty"><h2>Vamos começar por você</h2><p>Cadastre-se primeiro. Depois toque em qualquer pessoa da árvore para incluir pais, filhos, irmãos e cônjuge.</p><button class="btn green" id="startBtn">Cadastrar-me</button></div>` : `<div class="empty"><p>A árvore ainda está vazia.</p></div>`;
@@ -1175,7 +1176,7 @@ function openPerson(id){
     ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
     ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
-  if(canWrite) h+=`<button class="btn green" id="bAdd">+ Parente de ${esc(call(p))}</button><button class="btn green" id="bLink">🔗 Ligar a alguém da árvore</button><button class="btn ghost" id="bEdit">Editar</button>`;
+  if(canWrite) h+=`<button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button><button class="btn green" id="bLink">🔗 Ligar a alguém da árvore</button><button class="btn ghost" id="bEdit">Editar</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
   if(canWrite && !window.__root && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
@@ -1189,7 +1190,7 @@ function openPerson(id){
   { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
   { const bp=document.getElementById('bPriv'); if(bp) bp.onclick=()=>myCad.personId===id?openPrivacy():hideFrom(p); }
   if(canWrite){
-    document.getElementById('bAdd').onclick=()=>openForm(id,'add');
+    document.getElementById('bAdd').onclick=()=>openAcrescentar(null,id);
     document.getElementById('bEdit').onclick=()=>openForm(id,'edit');
     document.getElementById('bLink').onclick=()=>openAcrescentar(id); window.__linkVelho=()=>{openForm(id,'edit');setTimeout(()=>{const b=document.getElementById('relBox');b.closest('.field').scrollIntoView({block:'center'});b.closest('.field').style.background='var(--amber-soft)';b.closest('.field').style.borderRadius='10px';b.closest('.field').style.padding='8px'},250)};
     document.getElementById('noteAdd').onclick=async()=>{const t=document.getElementById('noteIn').value.trim();if(!t)return;
@@ -1699,7 +1700,7 @@ window.__incVelho=()=>{
 /* ---------- ➕ Acrescentar: perguntas objetivas, sem texto livre ---------- */
 // relação: o que a pessoa (P) é de quem já existe (T)
 const ACR_REL=[['pai','Pai','M','parentOf'],['mae','Mãe','F','parentOf'],['filho','Filho','M','childOf'],['filha','Filha','F','childOf'],['irmao','Irmão','M','sib'],['irma','Irmã','F','sib'],['marido','Marido','M','spouse'],['esposa','Esposa','F','spouse']];
-function openAcrescentar(startId){
+function openAcrescentar(startId,baseId){
   if(!canWrite){ if(window.NOSSIO_GAS){ if(wantWrite&&!myCad) return openCad(); return openCode(); } return; }
   let P=startId?byId(startId):null, novo=null; const links=[];
   const lista=()=>people.filter(p=>!p.unnamed&&!p.masked&&!p.fora);
@@ -1745,6 +1746,7 @@ function openAcrescentar(startId){
           links.push({T,k:r[0],lab:r[1],sex:r[2],rel:r[3]}); passo2(); }); }); };
     q.focus();
     document.getElementById('aSalvar').onclick=salvar;
+    if(baseId&&byId(baseId)&&!links.length){ const T=byId(baseId); q.value=T.name; q.oninput(); const bt=L.querySelector(`[data-t="${T.id}"]`); if(bt) bt.click(); }
   };
   let salvando=false;
   const salvar=async()=>{ if(salvando||!links.length) return; salvando=true;
