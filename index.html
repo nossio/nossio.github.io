@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261122-1230';
+const APPVER='v20261122-1240';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1370,6 +1370,8 @@ function openForm(baseId,kind){
   pendingPhoto=undefined;
   // pai/mãe sugeridos
   let fatherName = kind==='edit'?(byId(p.father)?.name||''):'', motherName = kind==='edit'?(byId(p.mother)?.name||''):'';
+  // vínculo indestrutível: pai/mãe já ligados (com nome) só o dono troca
+  const trava=s=>(kind==='edit'&&!isOwner&&p[s]&&byId(p[s])&&!byId(p[s]).unnamed)?'readonly style="background:#eee"':'';
   let rel='';
   if(kind==='add'){
     rel=`<div class="field"><label>Parentesco com ${esc(base.name)}</label><select id="fRel">
@@ -1390,8 +1392,8 @@ function openForm(baseId,kind){
     ${kind!=='root'?`<label class="check"><input type="checkbox" id="fProv" ${(p.provisional||kind==='add')?'checked':''}> Ficha provisória (dados a confirmar)</label>`:''}
     <div class="field"><label>Apelido (como a família chama)</label><input id="fNick" value="${esc(p.apelido||'')}" placeholder="Ex.: Zezim"></div>
     <div class="field"><label>Sexo</label><select id="fSex"><option value="">—</option><option value="M" ${p.sex==='M'?'selected':''}>Masculino</option><option value="F" ${p.sex==='F'?'selected':''}>Feminino</option></select></div>
-    <div class="field"><label>Nome do pai</label><input id="fFather" list="dlNames" value="${esc(fatherName)}" placeholder="Nome completo do pai"></div>
-    <div class="field"><label>Nome da mãe</label><input id="fMother" list="dlNames" value="${esc(motherName)}" placeholder="Nome completo da mãe"></div>
+    <div class="field"><label>Nome do pai</label><input id="fFather" list="dlNames" value="${esc(fatherName)}" placeholder="Nome completo do pai" ${trava('father')}></div>
+    <div class="field"><label>Nome da mãe</label><input id="fMother" list="dlNames" value="${esc(motherName)}" placeholder="Nome completo da mãe" ${trava('mother')}>${(trava('father')||trava('mother'))?'<div class="note" style="margin-top:-4px">🔒 Pai e mãe já ligados só o Ilacir pode trocar.</div>':''}</div>
     <datalist id="dlNames">${names}</datalist>
     <div class="field"><label>Outros parentes ${kind==='root'?'seus':'de '+esc(kind==='edit'?call(p):'quem está sendo cadastrado')} (ao preencher um, abre outro)</label><div id="relBox">${relRowHTML()}</div></div>
     <div class="field"><label>Data de nascimento</label><input id="fBirth" type="date" value="${esc(p.birth)}"></div>
