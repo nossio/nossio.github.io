@@ -468,7 +468,40 @@ function msgEntregar_(r, a) { const eu = quemSou_(r), s = abaCria_('msgs', ['id'
   throw new Error('Não encontrada.'); }
 function msgLida_(r, a) { const eu = quemSou_(r), de = String(a.de || ''), s = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']), v = s.getDataRange().getValues();
   for (let i = 1; i < v.length; i++) if (String(v[i][1]) === de && String(v[i][2]) === eu && !v[i][5]) s.getRange(i + 1, 6).setValue(Date.now()); return { ok: true }; }
+// ---------- convite pelo próprio cartão: "você já está na árvore" ----------
+// quem já está dentro gera um link para um parente que ainda não entrou; quem abre só concorda com as regras e entra no próprio cartão
+function convitesAba_() { return abaCria_('convites', ['token', 'pessoa', 'por', 'em', 'usado']); }
+function comConta_() { const s = new Set(cadastros_().map(c => c.personId).filter(Boolean)); s.add(DONO_ID); return s; }
+function cartaoCriar_(r, a) { const eu = quemSou_(r), para = String(a.para || ''), all = pessoas_(), P = all.find(p => p.id === para);
+  if (!P || P.data.unnamed || P.data.deceased) throw new Error('Não dá para convidar esta pessoa.');
+  if (!podeFalar_(r, eu, para)) throw new Error('Sem permissão.');
+  if (comConta_().has(para)) throw new Error('Esta pessoa já está no Nossio.');
+  const s = convitesAba_(), v = s.getDataRange().getValues();
+  for (let i = 1; i < v.length; i++) if (String(v[i][1]) === para && String(v[i][2]) === eu && !v[i][4]) return { t: String(v[i][0]) };
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789'; let t = ''; for (let i = 0; i < 12; i++) t += A[Math.floor(Math.random() * A.length)];
+  s.appendRow([t, para, eu, Date.now(), '']); return { t: t }; }
+function conviteDe_(t) { const v = convitesAba_().getDataRange().getValues();
+  for (let i = 1; i < v.length; i++) if (String(v[i][0]) === String(t)) return { row: i + 1, pessoa: String(v[i][1]), por: String(v[i][2]), usado: !!v[i][4] }; return null; }
+function descCurta_(all, id) { const byId = {}; all.forEach(p => byId[p.id] = p.data); const P = byId[id] || {}, nm = x => byId[x] && !byId[x].unnamed ? byId[x].name.split(' ')[0] : '';
+  const pais = [nm(P.father), nm(P.mother)].filter(Boolean), irm = all.filter(p => p.id !== id && ((P.father && p.data.father === P.father) || (P.mother && p.data.mother === P.mother)) && !p.data.unnamed).map(p => p.data.name.split(' ')[0]).slice(0, 3);
+  const f = P.sex === 'F' ? 'filha' : P.sex === 'M' ? 'filho' : 'filho(a)', i = P.sex === 'F' ? 'irmã' : P.sex === 'M' ? 'irmão' : 'irmão(ã)';
+  return [pais.length ? f + ' de ' + pais.join(' e ') : '', irm.length ? i + ' de ' + irm.join(', ') : '', P.spouse && nm(P.spouse) ? 'casado(a) com ' + nm(P.spouse) : ''].filter(Boolean).join(', '); }
+function cartaoVer_(a) { const c = conviteDe_(a.t); if (!c) throw new Error('Convite não encontrado.'); const all = pessoas_(), P = all.find(p => p.id === c.pessoa), Q = all.find(p => p.id === c.por);
+  if (!P) throw new Error('Convite não encontrado.');
+  return { nome: P.data.name, primeiro: P.data.name.split(' ')[0], por: Q ? Q.data.name.split(' ')[0] : 'Alguém da família', desc: descCurta_(all, c.pessoa), usado: c.usado || comConta_().has(c.pessoa) }; }
+function cartaoEntrar_(r, a) { const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { if (!/^DEV-/.test(String(r.code || ''))) throw new Error('Código inválido.'); if (cadLinha_(r.code)) throw new Error('Este aparelho já tem cadastro.');
+    const c = conviteDe_(a.t); if (!c) throw new Error('Convite não encontrado.'); if (c.usado || comConta_().has(c.pessoa)) throw new Error('Este convite já foi usado.');
+    const all = pessoas_(), P = all.find(p => p.id === c.pessoa), Q = all.find(p => p.id === c.por); if (!P) throw new Error('Convite não encontrado.');
+    const agora = Date.now(), d = { nome: P.data.name, cpf: '', cidade: '', naturalidade: '', nascimento: P.data.birth || '', mae: '', pai: '', apelido: P.data.apelido || '', aceite: true, aceiteRegras: agora, sexo: P.data.sex || '',
+      personId: c.pessoa, atualizado: agora, criado: agora, convidadoPor: Q ? Q.data.name : '', convidadoPorId: c.por, convidadoPorDono: true, confirmadoPor: 'convite' };
+    aba_('cadastro').appendRow([r.code, d.nome, '', '', '', '', d.apelido, d.nascimento, '', '', '', c.pessoa, new Date(), JSON.stringify(d)]);
+    convitesAba_().getRange(c.row, 5).setValue(agora); return { ok: true, personId: c.pessoa };
+  } finally { lock.releaseLock(); } }
+// ações abertas a quem ainda não tem cadastro (o Código.gs chama antes de exigir o cadastro)
+function extraLivre_(acao, r, a) { if (acao === 'cartaoVer') return cartaoVer_(a); if (acao === 'cartaoEntrar') return cartaoEntrar_(r, a); }
 // ações novas (o Código.gs chama estas duas funções)
-function extra_(acao, r, a) { if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); }
+function extra_(acao, r, a) { if (acao === 'comConta') return Array.from(comConta_()); if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); }
 function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r);
+  if (acao === 'cartaoCriar') return cartaoCriar_(r, a);
   if (acao === 'chavePub') return chavePub_(r, a); if (acao === 'msgEnviar') return msgEnviar_(r, a); if (acao === 'msgLida') return msgLida_(r, a); if (acao === 'msgEntregar') return msgEntregar_(r, a); }

@@ -168,7 +168,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0955';
+const APPVER='v20261123-1030';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -200,7 +200,7 @@ const GDB={collection:(c)=>({
 const GUSER={can:async()=>{const m=await meP(); return m.role!=='view'}, isOwner:async()=>{const m=await meP(); return m.role==='owner'}, canEdit:async()=>{const m=await meP(); return m.role==='owner'}, id:async()=>{const m=await meP(); return m.uid}};
 window.claude={use:async n=>n==='db'?GDB:n==='user'?GUSER:null};
 // convite pelo link: ...exec?c=NOS-XXXX-XXXX já entra com o código
-window.__locReady=(async()=>{ try{ const q=new URLSearchParams(location.search); const c=String(q.get('convite')||q.get('c')||'').trim().toUpperCase(); if(c){ LSset(CODEKEY,c); history.replaceState(null,'',location.pathname); } const de=String(q.get('de')||'').trim(); if(de){ LSset('nossio-de',de); history.replaceState(null,'',location.pathname); }
+window.__locReady=(async()=>{ try{ const q=new URLSearchParams(location.search); const c=String(q.get('convite')||q.get('c')||'').trim().toUpperCase(); if(c){ LSset(CODEKEY,c); history.replaceState(null,'',location.pathname); } const pt=String(q.get('p')||'').trim(); if(pt){ LSset('nossio-cartao',pt); history.replaceState(null,'',location.pathname); } const de=String(q.get('de')||'').trim(); if(de){ LSset('nossio-de',de); history.replaceState(null,'',location.pathname); }
     // mudança de endereço: o endereço antigo manda o código deste aparelho no # (não vai para servidor nenhum)
     const h=new URLSearchParams(location.hash.slice(1)), k=String(h.get('k')||'').trim(); if(k){ if(!LSget(CODEKEY)) LSset(CODEKEY,k); history.replaceState(null,'',location.pathname+location.search); } }catch(e){}
   // link único: quem não tem código ganha um código próprio deste aparelho
@@ -332,13 +332,13 @@ async function init(){
     try{ myId = await user.id(); const d = await db.collection('cadastro').doc(myId).get(); if(d&&d.exists){ myCad=d.data(); canWrite=true; } }catch(e){}
     showCadBar();
     // quem recebeu o link e ainda não preencheu o cadastro não vê nada da árvore
-    if(window.NOSSIO_GAS && !myCad){ showGate(); return; }
+    if(window.NOSSIO_GAS && !myCad){ if(LSget('nossio-cartao')) entrarPeloCartao(LSget('nossio-cartao')); else showGate(); return; }
     if(window.NOSSIO_GAS && !myCad.personId){ askHow(); return; }
     if(myCad.pend){ canWrite=false; setTimeout(()=>{ if(!document.getElementById('sheet').classList.contains('on')) showWait(); },1500); }
-    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); }
+    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); carregaComConta(); recemChegado(); }
   }
   const cb=document.getElementById('codeBtn'); if(cb){ cb.hidden=!(window.NOSSIO_GAS && !isOwner && !wantWrite); cb.onclick=openCode; }
-  if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); }
+  if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); carregaComConta(); }
   setStatus('Conectando…');
   const timer = setTimeout(()=>setStatus('Os dados ainda não chegaram — verifique a internet.'),10000);
   if(window.__unsub) window.__unsub();
@@ -1199,6 +1199,41 @@ function iniciaMensagens(){ if(!window.NOSSIO_GAS||!(isOwner||(myCad&&myCad.pers
   const b=document.getElementById('msgBtn'); if(b) b.onclick=abrirConversas;
   msgBuscar(); clearInterval(E2E.timer); E2E.timer=setInterval(()=>{ if(document.visibilityState==='visible') msgBuscar(); },E2E.aberta?6000:20000);
   setInterval(()=>{ if(E2E.aberta&&document.visibilityState==='visible'&&document.getElementById('mChat')) msgBuscar(); else if(!document.getElementById('mChat')) E2E.aberta=null; },6000); }
+
+/* ---------- "Você já está na árvore": convite pelo próprio cartão ---------- */
+let COMCONTA=null;
+async function carregaComConta(){ if(!window.NOSSIO_GAS) return; try{ COMCONTA=new Set(await gas('comConta')); }catch(e){} }
+async function chamarPeloWhats(p){ try{ const r=await gas('cartaoCriar',{para:p.id}); const prim=(p.apelido||p.name).split(' ')[0];
+    const desc=(()=>{ const f=byId(p.father), m=byId(p.mother), nm=x=>x&&!x.unnamed?(x.apelido||x.name).split(' ')[0]:''; const pais=[nm(f),nm(m)].filter(Boolean);
+      const irm=people.filter(x=>x.id!==p.id&&!x.unnamed&&((p.father&&x.father===p.father)||(p.mother&&x.mother===p.mother))).map(x=>(x.apelido||x.name).split(' ')[0]).slice(0,2);
+      const fo=p.sex==='F'?'filha':p.sex==='M'?'filho':'filho(a)', io=p.sex==='F'?'irmã':p.sex==='M'?'irmão':'irmão(ã)';
+      return [pais.length?fo+' de '+pais.join(' e '):'', irm.length?io+' de '+irm.join(' e '):''].filter(Boolean).join(' e '); })();
+    const link='https://nossio.github.io/?p='+r.t;
+    const txt=`${prim}, coloquei você na árvore da nossa família no Nossio${desc?', como '+desc:''}. 🌳\nConfere se está tudo certo? É só tocar no link e concordar com as regras — você já entra no seu próprio cartão:\n${link}`;
+    openSheet(`<h2>📲 Chamar ${esc(prim)}</h2><div class="sub">Este link é só para ${esc(prim)}: quem abrir entra direto no cartão dele(a). Mande só para ${esc(prim)}.</div>
+      <div class="missing" style="white-space:pre-wrap;font-size:14px">${esc(txt)}</div>
+      <a class="btn green" id="wZap" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener" style="display:block;text-align:center;width:100%;font-size:17px;padding:14px;margin-top:8px;text-decoration:none">Enviar pelo WhatsApp</a>
+      <button class="btn ghost" id="wCopia" style="width:100%;margin-top:8px">Copiar a mensagem</button>`);
+    document.getElementById('wCopia').onclick=async()=>{ try{ await navigator.clipboard.writeText(txt); toast('Mensagem copiada'); }catch(e){ toast('Não consegui copiar'); } };
+  }catch(e){ toast(String(e.message||'Não foi possível criar o convite')); } }
+async function entrarPeloCartao(t){ document.body.classList.add('gated'); setStatus(''); let c=null;
+  try{ c=await gas('cartaoVer',{t}); }catch(e){ LSdel('nossio-cartao'); return showGate(); }
+  if(c.usado){ LSdel('nossio-cartao'); openSheet(`<h2>Este convite já foi usado</h2><div class="sub">O cartão de ${esc(c.primeiro)} já tem dono. Se é você em outro aparelho, peça um novo link a quem te convidou.</div><button class="btn green" id="cOutro" style="width:100%">Entrar de outro jeito</button>`); document.getElementById('cOutro').onclick=showGate; return; }
+  openSheet(`<h1 style="font-size:34px;margin:4px 0 6px">Nossi<span>o</span></h1>
+    <h2 style="margin:6px 0">Olá, ${esc(c.primeiro)}! 👋</h2>
+    <div class="sub" style="font-size:16px;line-height:1.45"><b>${esc(c.por)}</b> colocou você na árvore da nossa família${c.desc?' como <b>'+esc(c.desc)+'</b>':''}.<br>O <b>Nossio</b> é uma árvore genealógica feita pelas próprias famílias. Para entrar no seu cartão, é só concordar com as regras. Seus dados você completa depois, quando quiser.</div>
+    ${REGRAS}
+    <div id="cErr" style="color:var(--red);font-size:14px;min-height:18px;margin-top:8px"></div>
+    <button class="btn green" id="cGo" style="width:100%;font-size:17px;padding:15px">Concordo e quero entrar</button>
+    <button class="btn ghost" id="cNao" style="width:100%;margin-top:8px">Não sou ${esc(c.primeiro)}</button>`);
+  document.getElementById('cNao').onclick=()=>{ LSdel('nossio-cartao'); showGate(); };
+  document.getElementById('cGo').onclick=async()=>{ const b=document.getElementById('cGo'); b.disabled=true; b.textContent='Entrando…';
+    try{ await gas('cartaoEntrar',{t}); LSdel('nossio-cartao'); try{ sessionStorage.setItem('nossio-recem','1'); }catch(e){} location.reload(); }
+    catch(e){ b.disabled=false; b.textContent='Concordo e quero entrar'; document.getElementById('cErr').textContent=String(e.message||'Não foi possível entrar agora.'); } };
+}
+// quem acabou de entrar pelo link: árvore centrada nele e a ficha aberta
+function recemChegado(){ let r=null; try{ r=sessionStorage.getItem('nossio-recem'); sessionStorage.removeItem('nossio-recem'); }catch(e){} if(!r||!myCad||!myCad.personId) return;
+  const me=myCad.personId; let n=0; const vai=()=>{ if(byId(me)){ treeRoot=me; verTodos=false; render(); centerOn(me); openPerson(me); bannerConvite('🎉 Pronto, você está na árvore! Esta é a sua ficha — confira e complete em ✏️ Corrigir.'); } else if(++n<25) setTimeout(vai,400); }; setTimeout(vai,800); }
 async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){ return; }
   if(isOwner){ novos=l.filter(x=>x.tipo==='novo'); mostraNovos(); } l=l.filter(x=>x.tipo!=='novo'); if(!l.length) return;
   const p=l[0], T={namorado:'namorado(a)',amigo:'amigo(a)'}, nxt=()=>{ closeSheet(); if(l.length>1) setTimeout(checkPedidos,400); };
@@ -1326,6 +1361,7 @@ function openPerson(id){
     ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
     ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
+  if(window.NOSSIO_GAS&&COMCONTA&&!COMCONTA.has(p.id)&&!p.deceased&&!p.unnamed&&!p.masked&&!p.limited&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bChama" style="background:#25a35a">📲 Chamar ${esc(call(p))} pelo WhatsApp</button><div class="sub" style="margin:-2px 0 8px;font-size:12.5px">${esc(call(p))} ainda não está no Nossio. Mande o convite: ele entra direto no próprio cartão.</div>`;
   if(window.NOSSIO_GAS&&!p.deceased&&!(myCad&&myCad.personId===p.id)&&!(isOwner&&p.id===DONO_ID)&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bMsg">💬 Mensagem para ${esc(call(p))}</button>`;
   if(canWrite) h+=`<button class="btn green" id="bEdit">✏️ Corrigir dados</button><button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
@@ -1335,7 +1371,7 @@ function openPerson(id){
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
-  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); }
+  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); } { const bc=document.getElementById('bChama'); if(bc) bc.onclick=()=>chamarPeloWhats(p); }
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
   { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
