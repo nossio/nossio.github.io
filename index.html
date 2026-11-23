@@ -173,7 +173,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1120';
+const APPVER='v20261123-1125';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -2124,8 +2124,8 @@ const Planets=(()=>{
       people=[...f.blood,...f.visit];
       const {pos}=layout(); let maxX=0,maxY=0; Object.values(pos).forEach(o=>{maxX=Math.max(maxX,o.x+NW);maxY=Math.max(maxY,o.y+NH)});
       const TOTW=Math.max(maxX+260,800), G=Math.max(2,Math.round(maxY/HROW)), PHI=Math.min(1.1,(0.42*(G-1)/2+0.15)*1.45)*0.5; /* linhas das gerações 50% mais próximas */ // famílias pequenas ocupam mais o planeta: fichas maiores
-      f.Rl=TOTW/(2*Math.PI*Math.cos(PHI))*0.92;
-      const unit=(x,y)=>{ const th=2*Math.PI*(x-maxX/2)/TOTW, t=(y/(G*HROW))*2-1, ph=-t*PHI; return [Math.cos(ph)*Math.sin(th),-Math.sin(ph),Math.cos(ph)*Math.cos(th)]; };
+      const SUB=Math.min(PHI*0.5,1.25-PHI); /* tudo sobe: avós mais ao norte, novos perto do equador */ f.Rl=TOTW/(2*Math.PI*Math.cos(PHI))*0.92;
+      const unit=(x,y)=>{ const th=2*Math.PI*(x-maxX/2)/TOTW, t=(y/(G*HROW))*2-1, ph=-t*PHI+SUB; return [Math.cos(ph)*Math.sin(th),-Math.sin(ph),Math.cos(ph)*Math.cos(th)]; };
       const segs=[], dsp=new Set();
       people.forEach(p=>{
         // no planeta os nomes são etiquetas no centro de cada caixa: as linhas vão de centro a centro, para encostarem nelas
