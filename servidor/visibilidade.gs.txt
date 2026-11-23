@@ -109,7 +109,7 @@ function pedidos_(r) {
         const q = quemAutoriza_(byId, T, C, cads) || [], ok = (l.ver || {})[C.id] || [], nao = (l.naoVer || {})[C.id] || [];
         if (q.includes(eu) && !ok.includes(eu) && !nao.includes(eu)) out.push({ de: p.id, nome: p.data.name, tipo: 'verFilho', para: T.id, paraNome: T.data.name, filho: C.id, filhoNome: C.data.name, eProprio: C.id === eu, menor: menor_(C.data) });
       }); })); }
-  return out.concat(pedidosFoto_(r, eu));
+  return out.concat(pedidosFoto_(r, eu), pedidosLigar_(eu, r.role === 'owner'));
 }
 // quem entrou nas últimas 24 h (só para o dono): some depois de um dia, ou quando o dono aprova/edita
 function novos_() {
@@ -126,6 +126,7 @@ function novos_() {
 }
 function responder_(r, a) {
   if (a.foto) return responderFoto_(r, a);
+  if (a.ligar) return responderLigar_(r, a);
   if (a.novo) { if (r.role !== 'owner') throw new Error('Sem permissão.');
     const c = cadastros_().find(x => hash_(String(x.code)) === String(a.de)); if (!c) throw new Error('Não encontrado.');
     c.data.vistoDono = true; salvarCad_(c); return { ok: true }; }
@@ -498,10 +499,52 @@ function cartaoEntrar_(r, a) { const lock = LockService.getScriptLock(); lock.wa
     aba_('cadastro').appendRow([r.code, d.nome, '', '', '', '', d.apelido, d.nascimento, '', '', '', c.pessoa, new Date(), JSON.stringify(d)]);
     convitesAba_().getRange(c.row, 5).setValue(agora); return { ok: true, personId: c.pessoa };
   } finally { lock.releaseLock(); } }
+// ---------- quem entrou sozinho pede para se ligar a um parente; só liga quando essa pessoa (ou o dono) autorizar ----------
+const LIGA_ = { filho: 1, pai: 1, irmao: 1, conjuge: 1 };
+function sozinho_(all, id) { const P = all.find(p => p.id === id); if (!P) return false; const d = P.data;
+  if (d.father || d.mother || d.spouse) return false; return !all.some(p => p.data.father === id || p.data.mother === id || p.data.spouse === id); }
+function ligarBuscar_(r, a) { const c = cadLinha_(r.code), eu = c && c.data.personId;
+  return buscar_(pessoas_().filter(p => p.id !== eu && !p.data.saiu && !p.data.semNome), a.nome); }
+function ligarPedir_(r, a) {
+  const c = cadLinha_(r.code); if (!c || !c.data.personId) throw new Error('Complete o cadastro antes.');
+  const eu = c.data.personId, all = pessoas_(), T = all.find(p => p.id === String(a.to));
+  if (!T || T.data.unnamed || T.id === eu) throw new Error('Pessoa não encontrada.');
+  if (!LIGA_[a.rel]) throw new Error('Escolha o parentesco.');
+  if (!sozinho_(all, eu)) throw new Error('Você já está ligado(a) à árvore.');
+  c.data.pedeLigar = { to: T.id, toNome: T.data.name, rel: a.rel, sexo: a.sexo === 'F' ? 'F' : 'M', em: Date.now() }; delete c.data.ligarRecusado; salvarCad_(c);
+  return { ok: true, pedeLigar: c.data.pedeLigar };
+}
+function ligarCancelar_(r) { const c = cadLinha_(r.code); if (c && c.data.pedeLigar) { delete c.data.pedeLigar; salvarCad_(c); } return { ok: true }; }
+function pedidosLigar_(eu, owner) { const out = [];
+  cadastros_().forEach(c => { const pl = c.data.pedeLigar; if (!pl || !(owner || pl.to === eu)) return;
+    out.push({ tipo: 'ligar', de: c.personId, nome: c.data.nome, rel: pl.rel, sexo: pl.sexo, para: pl.to, paraNome: pl.toNome }); });
+  return out; }
+function responderLigar_(r, a) {
+  const me = cadLinha_(r.code), eu = me && me.data.personId, owner = r.role === 'owner';
+  const c = cadastros_().find(x => x.personId === String(a.de) && x.data.pedeLigar); if (!c) throw new Error('Pedido não encontrado.');
+  const pl = c.data.pedeLigar; if (!(owner || pl.to === eu)) throw new Error('Só ' + String(pl.toNome).split(' ')[0] + ' pode autorizar.');
+  delete c.data.pedeLigar;
+  if (!a.aceitar) { c.data.ligarRecusado = { toNome: pl.toNome, em: Date.now() }; salvarCad_(c); return { ok: true }; }
+  const all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p);
+  const M = byId[c.personId], T = byId[pl.to]; if (!M || !T) throw new Error('Pessoa não encontrada.');
+  const m = M.data, t = T.data; m.sex = m.sex || pl.sexo;
+  if (pl.rel === 'filho') { if (t.sex === 'F') m.mother = T.id; else m.father = T.id;
+    const sp = t.spouse && byId[t.spouse]; if (sp) { if (sp.data.sex === 'F') { if (!m.mother) m.mother = sp.id; } else if (!m.father) m.father = sp.id; } }
+  else if (pl.rel === 'pai') { const k = m.sex === 'F' ? 'mother' : 'father'; if (t[k]) throw new Error(t.name + ' já tem ' + (k === 'mother' ? 'mãe' : 'pai') + ' ligado(a).');
+    t[k] = M.id; t.parents = [t.father, t.mother].filter(Boolean); salvarPessoa_(T.id, t); }
+  else if (pl.rel === 'irmao') { if (!t.father && !t.mother) { const pid = novoId_();
+      salvarPessoa_(pid, { name: 'Pai de ' + String(t.name).split(' ')[0], unnamed: true, provisional: true, sex: 'M', father: null, mother: null, parents: [], spouse: null, photo: null, createdAt: Date.now() });
+      t.father = pid; t.parents = [pid]; salvarPessoa_(T.id, t); }
+    m.father = t.father || null; m.mother = t.mother || null; }
+  else if (pl.rel === 'conjuge') { if (t.spouse) throw new Error(t.name + ' já tem cônjuge ligado(a).'); t.spouse = M.id; m.spouse = T.id; salvarPessoa_(T.id, t); }
+  m.parents = [m.father, m.mother].filter(Boolean); m.provisional = false; m.confirmadoPor = eu || 'dono'; salvarPessoa_(M.id, m);
+  c.data.ligadoPor = eu || 'dono'; salvarCad_(c); return { ok: true };
+}
 // ações abertas a quem ainda não tem cadastro (o Código.gs chama antes de exigir o cadastro)
 function extraLivre_(acao, r, a) { if (acao === 'cartaoVer') return cartaoVer_(a); if (acao === 'cartaoEntrar') return cartaoEntrar_(r, a); }
 // ações novas (o Código.gs chama estas duas funções)
-function extra_(acao, r, a) { if (acao === 'comConta') return Array.from(comConta_()); if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); }
+function extra_(acao, r, a) { if (acao === 'comConta') return Array.from(comConta_()); if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); if (acao === 'ligarBuscar') return ligarBuscar_(r, a); }
 function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r);
   if (acao === 'cartaoCriar') return cartaoCriar_(r, a);
+  if (acao === 'ligarPedir') return ligarPedir_(r, a); if (acao === 'ligarCancelar') return ligarCancelar_(r);
   if (acao === 'chavePub') return chavePub_(r, a); if (acao === 'msgEnviar') return msgEnviar_(r, a); if (acao === 'msgLida') return msgLida_(r, a); if (acao === 'msgEntregar') return msgEntregar_(r, a); }

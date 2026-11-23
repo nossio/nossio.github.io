@@ -173,7 +173,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1125';
+const APPVER='v20261123-1345';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -340,7 +340,7 @@ async function init(){
     if(window.NOSSIO_GAS && !myCad){ if(LSget('nossio-cartao')) entrarPeloCartao(LSget('nossio-cartao')); else showGate(); return; }
     if(window.NOSSIO_GAS && !myCad.personId){ askHow(); return; }
     if(myCad.pend){ canWrite=false; setTimeout(()=>{ if(!document.getElementById('sheet').classList.contains('on')) showWait(); },1500); }
-    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); carregaComConta(); recemChegado(); }
+    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); carregaComConta(); recemChegado(); avisoLigar(); }
   }
   const cb=document.getElementById('codeBtn'); if(cb){ cb.hidden=!(window.NOSSIO_GAS && !isOwner && !wantWrite); cb.onclick=openCode; }
   if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); carregaComConta(); }
@@ -1249,6 +1249,11 @@ async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){
     openSheet(`<h2>Esta foto é mesmo de ${esc(p.nome)}? 📷</h2><div style="display:flex;justify-content:center;margin:10px 0"><img src="${p.img}" alt="" style="width:200px;height:200px;border-radius:50%;object-fit:cover"></div><div class="sub" style="text-align:center">${esc(p.nome.split(' ')[0])} colocou esta foto. Ela aparece para todos quando ${p.precisa} parentes confirmarem.</div>`+btns('✓ Sim, é '+esc(p.nome.split(' ')[0]),'Não é'));
     const fr=async v=>{ try{ await gas('responder',{foto:true,de:p.de,sim:v}); toast('Obrigado!'); }catch(e){ toast(String(e.message||'Não foi possível')); } nxt(); };
     document.getElementById('pS').onclick=()=>fr(true); document.getElementById('pN').onclick=()=>fr(false); document.getElementById('pD').onclick=nxt; return; }
+  if(p.tipo==='ligar'){ const R={filho:p.sexo==='F'?'filha':'filho',pai:p.sexo==='F'?'mãe':'pai',irmao:p.sexo==='F'?'irmã':'irmão',conjuge:p.sexo==='F'?'esposa':'marido'}, nm='<b>'+esc(p.nome)+'</b>', r='<b>'+(R[p.rel]||'parente')+'</b>';
+    const souEu=myCad&&myCad.personId===p.para;
+    openSheet(`<h2>Pedido de ligação 🔗</h2><div class="sub" style="font-size:16px">${souEu?`${nm} diz que é ${r} seu e pede para se conectar contigo.`:`${nm} diz que é ${r} de <b>${esc(p.paraNome)}</b> e pede para se conectar.`}<br><br>Autorizar?</div>`+btns('✓ Autorizar','Não conheço'));
+    const lr=async v=>{ try{ await gas('responder',{ligar:true,de:p.de,aceitar:v}); toast(v?'Ligado(a)! Atualize a página para ver.':'Recusado'); }catch(e){ toast(String(e.message||'Não foi possível')); } nxt(); };
+    document.getElementById('pS').onclick=()=>lr(true); document.getElementById('pN').onclick=()=>lr(false); document.getElementById('pD').onclick=closeSheet; return; }
   if(p.tipo==='dup'){
     openSheet(`<h2>É a mesma pessoa? 👥</h2><div class="sub" style="font-size:16px">${p.quem?esc(p.quem)+' incluiu':'Foi incluído(a)'} <b>${esc(p.nome)}</b> (${esc(p.descNovo)}).<br><br>Já existe <b>${esc(p.paraNome)}</b> (${esc(p.descVelho)}). É a mesma pessoa?</div>
       <div class="sub" style="font-size:13px">Se for, as duas fichas viram uma só, com o nome mais completo.</div>${btns('Sim, juntar','Não, são diferentes')}`);
@@ -1895,8 +1900,43 @@ window.__incVelho=()=>{
 /* ---------- ➕ Acrescentar: perguntas objetivas, sem texto livre ---------- */
 // relação: o que a pessoa (P) é de quem já existe (T)
 const ACR_REL=[['pai','Pai','M','parentOf'],['mae','Mãe','F','parentOf'],['filho','Filho','M','childOf'],['filha','Filha','F','childOf'],['irmao','Irmão','M','sib'],['irma','Irmã','F','sib'],['marido','Marido','M','spouse'],['esposa','Esposa','F','spouse']];
-function openAcrescentar(startId,baseId){
+/* ---------- quem entrou sozinho pede para se ligar a um parente; só liga quando essa pessoa (ou o Ilacir) autorizar ---------- */
+function meSozinho(){ if(isOwner||!window.NOSSIO_GAS||!myCad||!myCad.personId) return false; const id=myCad.personId, m=byId(id); if(!m) return false;
+  return !m.father&&!m.mother&&!m.spouse&&!people.some(p=>p.father===id||p.mother===id||p.spouse===id); }
+const LIG_REL=[['filho','Sou filho de','M','filho'],['filha','Sou filha de','F','filho'],['pai','Sou pai de','M','pai'],['mae','Sou mãe de','F','pai'],['irmao','Sou irmão de','M','irmao'],['irma','Sou irmã de','F','irmao'],['marido','Sou marido de','M','conjuge'],['esposa','Sou esposa de','F','conjuge']];
+function esperaLigar(pl){ const n=esc((pl.toNome||'').split(' ')[0]||'a pessoa');
+  openSheet(`<h2>⏳ Aguardando ${n}</h2><div class="sub" style="font-size:16px">Seu pedido foi enviado. <b>Aguardando ${esc(pl.toNome||'')} autorizar se conectar contigo.</b></div><div class="note">Assim que autorizar, a árvore da família aparece para você.</div>
+    <button class="btn green" id="lgOk" style="width:100%;margin-bottom:8px">Ok</button><button class="btn ghost" id="lgCan" style="width:100%">Cancelar o pedido</button>`);
+  document.getElementById('lgOk').onclick=closeSheet;
+  document.getElementById('lgCan').onclick=async()=>{ try{ await gas('ligarCancelar'); delete myCad.pedeLigar; ME=null; toast('Pedido cancelado'); }catch(e){ toast('Não foi possível'); } closeSheet(); }; }
+function openLigar(){
+  if(myCad.pedeLigar) return esperaLigar(myCad.pedeLigar);
+  openSheet(`<h2>🔗 Ligar-me à família</h2><div class="sub">Quem da sua família já está no Nossio? Essa pessoa precisa autorizar a ligação.</div>
+    <input id="lgQ" class="inp cad" placeholder="Digite o nome — ex.: Jacy Ferreira" autocomplete="off">
+    <div id="lgL" style="margin:6px 0"></div><div id="lgR"></div>
+    <div id="lgErr" style="color:var(--red);font-size:14px;min-height:18px"></div>
+    <button class="btn ghost" id="lgNovo" style="width:100%">Ninguém da família está aqui — acrescentar parentes</button>`);
+  document.getElementById('lgNovo').onclick=()=>openAcrescentar(myCad.personId,null,true);
+  const q=document.getElementById('lgQ'), L=document.getElementById('lgL'), R=document.getElementById('lgR'); let tm=null, seq=0;
+  q.oninput=()=>{ clearTimeout(tm); R.innerHTML=''; const v=q.value.trim(); if(nrm(v).length<3){ L.innerHTML=''; return; }
+    tm=setTimeout(async()=>{ const my=++seq; L.innerHTML='<div class="sub">Procurando…</div>'; let l=[]; try{ l=await gas('ligarBuscar',{nome:v}); }catch(e){} if(my!==seq) return;
+      L.innerHTML=l.length?l.map(p=>`<button class="btn ghost" data-t="${p.id}" style="display:block;width:100%;text-align:left;margin:4px 0">${esc(p.name)}${p.ano?' · '+p.ano:''}${p.dica?'<br><small>'+esc(p.dica)+'</small>':''}</button>`).join(''):'<div class="sub">Não encontrei. Confira o nome completo.</div>';
+      L.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{ const T=l.find(x=>x.id===b.dataset.t); L.innerHTML=''; q.value=T.name;
+        R.innerHTML=`<label class="lbl" style="font-size:15px;color:var(--ink)"><b>Você é o quê de ${esc(T.name)}?</b></label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${LIG_REL.map(([k,lab])=>`<button class="btn ghost" data-r="${k}" style="padding:12px">${lab}</button>`).join('')}</div>`;
+        R.querySelectorAll('[data-r]').forEach(c=>c.onclick=async()=>{ const r=LIG_REL.find(x=>x[0]===c.dataset.r);
+          try{ const o=await gas('ligarPedir',{to:T.id,rel:r[3],sexo:r[2]}); myCad.pedeLigar=o.pedeLigar; ME=null; esperaLigar(o.pedeLigar); }
+          catch(e){ document.getElementById('lgErr').textContent=String(e.message||'Não foi possível. Tente de novo.'); } }); }); },450); };
+  q.focus();
+}
+// ao abrir: quem está sozinho vê o aviso (esperando autorização, recusado, ou o convite para se ligar)
+function avisoLigar(){ let n=0; const vai=()=>{ if(!myCad||!myCad.personId) return; if(!byId(myCad.personId)){ if(++n<25) setTimeout(vai,500); return; }
+  if(myCad.pedeLigar) return bannerConvite('⏳ Aguardando <b>'+esc(myCad.pedeLigar.toNome)+'</b> autorizar se conectar contigo.');
+  if(myCad.ligarRecusado&&meSozinho()) return bannerConvite('<b>'+esc(myCad.ligarRecusado.toNome)+'</b> não autorizou a ligação. Confira se escolheu a pessoa certa em ➕ Acrescentar pessoa.');
+  if(meSozinho()&&!document.getElementById('sheet').classList.contains('on')) openLigar(); }; setTimeout(vai,1500); }
+function openAcrescentar(startId,baseId,livre){
   if(!canWrite){ if(window.NOSSIO_GAS){ if(wantWrite&&!myCad) return openCad(); return openCode(); } return; }
+  if(!livre&&meSozinho()) return openLigar();
   let P=startId?byId(startId):null, novo=null; const links=[];
   const lista=()=>people.filter(p=>!p.unnamed&&!p.masked&&!p.fora);
   const busca=(q,excl)=>{ const n=nrm(q); if(n.length<2) return []; const ws=n.split(' ');
