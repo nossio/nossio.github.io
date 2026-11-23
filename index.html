@@ -170,7 +170,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1040';
+const APPVER='v20261123-1045';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -2213,9 +2213,16 @@ const Planets=(()=>{
         f.lines.forEach(pts=>{ let prev=null; const n=pts.length, g0=Math.floor(n*0.4), g1=Math.ceil(n*0.6);
           if(pts.sep){ const A=surf(f,pts[g0]), B=surf(f,pts[g1]); if(A.front>0.05&&B.front>0.05) boltAt(A.p,B.p,Math.max(1,3.6*sc),0.25+0.55*B.front); }
           pts.forEach((u,i)=>{ const s=surf(f,u); if(pts.sep&&i>g0&&i<=g1){prev=s;return} if(prev&&s.front>0&&prev.front>0){ ctx.strokeStyle=`rgba(255,255,255,${0.25+0.55*s.front})`; ctx.lineWidth=Math.max(1,3.6*sc); ctx.beginPath(); ctx.moveTo(prev.p.x,prev.p.y); ctx.lineTo(s.p.x,s.p.y); ctx.stroke(); } prev=s; }); });
-        const k=Math.min(1.35,Math.max(0.55,sc*2.1));
-        f.nodes.map(n=>({n,s:surf(f,n.u)})).filter(o=>o.s.front>0.05).sort((a,b)=>a.s.front-b.s.front).forEach(({n,s})=>{
-          const p=n.p, t=call(p)+(p.deceased?' †':''), kk=Math.min(k, 150*sc*1.02/(t.length*9.2+26)), fs=16*kk, w=(t.length*9.2+26)*kk, h=33*Math.max(kk,k*0.75);
+        const k=Math.min(2.7,Math.max(1.1,sc*4.2)); // fichas com o dobro do tamanho
+        const vis=f.nodes.map(n=>({n,s:surf(f,n.u)})).filter(o=>o.s.front>0.05);
+        // tamanho grande, mas encolhe só onde as fichas se encostariam
+        vis.forEach(o=>{ const p=o.n.p, t=call(p)+(p.deceased?' †':''); o.t=t; o.kk=Math.min(k, 300*sc*1.02/(t.length*9.2+26)); o.ex=fotoDe(p)?1:0; });
+        const dims=o=>{ const h=33*Math.max(o.kk,k*0.75); return {w:(o.t.length*9.2+26)*o.kk+(o.ex?h*0.95:0),h}; };
+        for(let pass=0;pass<3;pass++) for(let i=0;i<vis.length;i++) for(let j=i+1;j<vis.length;j++){ const A=vis[i], B=vis[j], da=dims(A), db=dims(B);
+          const dx=Math.abs(A.s.p.x-B.s.p.x), dy=Math.abs(A.s.p.y-B.s.p.y);
+          if(dy<(da.h+db.h)/2*0.98 && dx<(da.w+db.w)/2){ const fx=Math.max(0.45,(dx*0.96)/((da.w+db.w)/2)), fy=Math.max(0.45,(dy*0.96)/((da.h+db.h)/2)), fct=Math.max(fx,fy); if(fct<1){ A.kk*=fct; B.kk*=fct; } } }
+        vis.sort((a,b)=>a.s.front-b.s.front).forEach(({n,s,kk,t})=>{
+          const p=n.p, fs=16*kk, w=(t.length*9.2+26)*kk, h=33*Math.max(kk,Math.min(k*0.75,kk*1.15));
           ctx.globalAlpha=Math.min(1,0.25+s.front*1.3); const hl=highlight.has(p.id);
           ctx.fillStyle=hl?'#fff4d6':p.deceased?'#d8c6ec':isMinor(p)?'#fde9f1':'rgba(255,255,255,.94)'; ctx.strokeStyle=hl?'#f0b44c':p.deceased?'#b9a0d0':isMinor(p)?'#e3a9bd':(p.provisional||p.unnamed)?'#d0a35a':'#b9ab8f'; ctx.lineWidth=hl?2.6:1.1;
           const fim=fotoImg(fotoDe(p)), ex=fim?h*0.95:0, W2=w+ex, x0=s.p.x-W2/2;
