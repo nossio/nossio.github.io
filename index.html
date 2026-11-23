@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261122-1330';
+const APPVER='v20261123-0800';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -699,7 +699,7 @@ function openNews(){
   try{ localStorage.setItem(NEWSKEY,String(Date.now())) }catch(e){} updNewsBtn();
 }
 /* ---------- possíveis duplicados (Jaro-Winkler + parentes em comum) ---------- */
-const nrm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(da|de|do|das|dos|e)\b/g,' ').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+const nrm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(da|de|do|das|dos|e)\b/g,' ').replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim().replace(/ph/g,'f').replace(/th/g,'t').replace(/y/g,'i').replace(/k/g,'c').replace(/([a-z])\1+/g,'$1'); // Luryane = Luriane
 function jw(a,b){ if(a===b) return 1; const la=a.length, lb=b.length; if(!la||!lb) return 0; const md=Math.max(0,Math.floor(Math.max(la,lb)/2)-1), ma=new Array(la).fill(false), mb=new Array(lb).fill(false); let m=0;
   for(let i=0;i<la;i++){ for(let j=Math.max(0,i-md);j<Math.min(lb,i+md+1);j++){ if(!mb[j]&&a[i]===b[j]){ma[i]=mb[j]=true;m++;break;} } } if(!m) return 0;
   let t=0,k=0; for(let i=0;i<la;i++) if(ma[i]){ while(!mb[k])k++; if(a[i]!==b[k])t++; k++; } const d=(m/la+m/lb+(m-t/2)/m)/3; let l=0; while(l<4&&a[l]===b[l])l++; return d+l*0.1*(1-d); }

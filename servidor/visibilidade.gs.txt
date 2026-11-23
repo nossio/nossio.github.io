@@ -15,7 +15,7 @@ function visiveis_(all, startId) {
   while (q.length) { const x = q.pop(); (adj[x] || []).forEach(y => { if (!seen.has(y)) { seen.add(y); q.push(y); } }); }
   return seen;
 }
-function norm_(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(da|de|do|das|dos|e)\b/g, ' ').replace(/\s+/g, ' ').trim(); }
+function norm_(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(da|de|do|das|dos|e)\b/g, ' ').replace(/\s+/g, ' ').trim().replace(/ph/g, 'f').replace(/th/g, 't').replace(/y/g, 'i').replace(/k/g, 'c').replace(/([a-z])\1+/g, '$1'); } // grafias parecidas contam como iguais (Luryane = Luriane)
 function salvarPessoa_(id, data) {
   const s = aba_('people'), ids = s.getRange(1, 1, Math.max(1, s.getLastRow()), 1).getValues().map(x => String(x[0]));
   const linha = [id, JSON.stringify(data), new Date()], i = ids.indexOf(String(id));
@@ -46,6 +46,7 @@ function vincular_(r, a) {
   const rel = a.rel, to = a.to ? byId[a.to] : null;
   if (rel !== 'conhecer' && !to) throw new Error('Pessoa não encontrada.');
   if (cad.personId && byId[cad.personId]) throw new Error('Você já está ligado(a) à árvore.');
+  if (rel === 'eu' && a.to === DONO_ID) throw new Error('Essa pessoa já tem cadastro próprio.'); // ninguém assume o cartão do dono
   if (rel === 'eu' && aba_('cadastro').getDataRange().getValues().slice(1).some(x => String(x[11]) === String(a.to))) throw new Error('Essa pessoa já tem cadastro próprio.');
   let meId;
   if (a.convite && !liberados_().has(a.to)) a.convite = false; // convite só vale de quem já está liberado
@@ -186,6 +187,7 @@ function visaoAmigos_(all, eu, vis) {
 
 // ---------- confirmação da família e privacidade (prioridade total: quem não quer ser visto some na hora) ----------
 function assumir_(id, cad, r) {
+  if (id === DONO_ID) return;
   const p = pessoas_().find(x => x.id === id); if (!p) return; const me = p.data;
   me.provisional = false; if (cad.nascimento && !me.birth) me.birth = cad.nascimento;
   me.updatedBy = r.uid; me.updatedByName = cad.nome.split(' ')[0]; me.updatedAt = Date.now(); salvarPessoa_(id, me);
