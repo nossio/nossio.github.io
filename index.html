@@ -161,7 +161,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0900';
+const APPVER='v20261123-0925';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1084,7 +1084,7 @@ function avisoFoto(){ if(isOwner||!myCad||!myCad.personId||myCad.pend) return; i
   if(FOTOS[myCad.personId]&&(!MINHA_FOTO||MINHA_FOTO.estado!=='recusada')) return; if(MINHA_FOTO&&MINHA_FOTO.estado==='pend') return;
   if(document.getElementById('bnFoto')) return;
   const b=document.createElement('div'); b.id='bnFoto'; b.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:60;background:#fffdf7;border:1px solid #d8ccb4;border-radius:16px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;gap:10px;align-items:center;max-width:520px;margin:0 auto';
-  b.innerHTML='<div style="font-size:28px">📷</div><div style="flex:1;font-size:15px"><b>Coloque sua foto</b><br><span style="color:var(--muted);font-size:13px">Só você pode pôr a sua. 3 parentes confirmam que é você.</span></div><button class="btn green" id="bnFotoS">Pôr foto</button><button class="btn ghost" id="bnFotoN" aria-label="Agora não">✕</button>';
+  b.innerHTML='<div style="font-size:28px">📷</div><div style="flex:1;font-size:15px"><b>Coloque sua foto</b><br><span style="color:var(--muted);font-size:13px">Só você pode pôr a sua.</span></div><button class="btn green" id="bnFotoS">Pôr foto</button><button class="btn ghost" id="bnFotoN" aria-label="Agora não">✕</button>';
   document.body.appendChild(b);
   document.getElementById('bnFotoS').onclick=()=>{ b.remove(); pegarFoto(); };
   document.getElementById('bnFotoN').onclick=()=>{ b.remove(); sessionStorage.setItem('nossio-semfoto','1'); };

@@ -394,6 +394,8 @@ function responderDup_(r, a) {
 
 // ---------- fotos: só a própria pessoa põe a dela; 3 parentes confirmam que é ela ----------
 const FOTO_OK = 3, FOTO_NAO = 2;
+// regra suspensa por enquanto (decisão do Ilacir em 23/11/2026): a foto entra na hora. Para voltar a exigir 3 confirmações, mude para true.
+const FOTO_CONFIRMAR = false;
 function fotosAba_() { const ss = SpreadsheetApp.getActiveSpreadsheet(); let s = ss.getSheetByName('fotos');
   if (!s) { s = ss.insertSheet('fotos'); s.appendRow(['pessoa', 'estado', 'imagem', 'enviada', 'sim', 'nao']); } return s; }
 function fotos_() { const s = fotosAba_(), v = s.getDataRange().getValues(); const out = {};
@@ -405,7 +407,7 @@ function salvarFoto_(id, f) { const s = fotosAba_(), linha = [id, f.estado, f.im
 // fotos aprovadas que quem pede pode ver (mesma visibilidade da árvore)
 function fotosVer_(r) { const F = fotos_(), vis = new Set(lista_(r).filter(p => !p.data.masked && !p.data.limited).map(p => p.id));
   const c = r.role === 'owner' ? null : cadLinha_(r.code), eu = c && c.data.personId, out = {};
-  Object.keys(F).forEach(id => { const f = F[id]; if (f.estado === 'ok' && (r.role === 'owner' || vis.has(id))) out[id] = f.img;
+  Object.keys(F).forEach(id => { const f = F[id]; if ((f.estado === 'ok' || (!FOTO_CONFIRMAR && f.estado === 'pend')) && (r.role === 'owner' || vis.has(id))) out[id] = f.img;
     else if (id === eu && f.img) out[id] = f.img; }); // a própria pessoa vê a dela enquanto espera
   const minha = eu && F[eu] ? { estado: F[eu].estado, sim: F[eu].sim.length, precisa: FOTO_OK } : null;
   return { fotos: out, minha: minha }; }
@@ -414,12 +416,12 @@ function fotoEnviar_(r, a) {
   if (c.data.pend) throw new Error('Aguarde a família confirmar você.');
   const img = String(a.img || ''); if (!/^data:image\/jpeg;base64,/.test(img) || img.length > 48000) throw new Error('Foto inválida ou grande demais.');
   const F = fotos_(), f = F[eu] || {}; f.estado = 'pend'; f.img = img; f.em = Date.now(); f.sim = []; f.nao = [];
-  if (eu === DONO_ID) f.estado = 'ok'; // o dono não espera confirmação
+  if (eu === DONO_ID || !FOTO_CONFIRMAR) f.estado = 'ok'; // o dono não espera; e, com a regra suspensa, ninguém espera
   salvarFoto_(eu, f); return { ok: true, estado: f.estado }; }
 function fotoTirar_(r) { const c = cadLinha_(r.code), eu = c && c.data.personId; if (!eu && r.role !== 'owner') throw new Error('Sem permissão.');
   const id = eu || DONO_ID, F = fotos_(); if (!F[id]) return { ok: true }; fotosAba_().deleteRow(F[id].row); return { ok: true }; }
 // parentes com cadastro e liberados recebem a pergunta "esta foto é mesmo de fulano?"
-function pedidosFoto_(r, eu) { const F = fotos_(), pend = Object.keys(F).filter(id => F[id].estado === 'pend'); if (!pend.length) return [];
+function pedidosFoto_(r, eu) { if (!FOTO_CONFIRMAR) return []; const F = fotos_(), pend = Object.keys(F).filter(id => F[id].estado === 'pend'); if (!pend.length) return [];
   const all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p.data); const out = [];
   pend.forEach(id => { const f = F[id], P = byId[id]; if (!P || id === eu) return;
     if (f.sim.includes(eu || 'dono') || f.nao.includes(eu || 'dono')) return;
