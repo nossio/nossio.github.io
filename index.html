@@ -173,7 +173,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1050';
+const APPVER='v20261123-1100';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -2123,7 +2123,7 @@ const Planets=(()=>{
     fams.forEach(f=>{
       people=[...f.blood,...f.visit];
       const {pos}=layout(); let maxX=0,maxY=0; Object.values(pos).forEach(o=>{maxX=Math.max(maxX,o.x+NW);maxY=Math.max(maxY,o.y+NH)});
-      const TOTW=Math.max(maxX+260,1400), G=Math.max(2,Math.round(maxY/HROW)), PHI=Math.min(1.05,0.42*(G-1)/2+0.15);
+      const TOTW=Math.max(maxX+260,800), G=Math.max(2,Math.round(maxY/HROW)), PHI=Math.min(1.1,(0.42*(G-1)/2+0.15)*1.45); // famílias pequenas ocupam mais o planeta: fichas maiores
       f.Rl=TOTW/(2*Math.PI*Math.cos(PHI))*0.92;
       const unit=(x,y)=>{ const th=2*Math.PI*(x-maxX/2)/TOTW, t=(y/(G*HROW))*2-1, ph=-t*PHI; return [Math.cos(ph)*Math.sin(th),-Math.sin(ph),Math.cos(ph)*Math.cos(th)]; };
       const segs=[], dsp=new Set();
@@ -2216,10 +2216,10 @@ const Planets=(()=>{
         f.lines.forEach(pts=>{ let prev=null; const n=pts.length, g0=Math.floor(n*0.4), g1=Math.ceil(n*0.6);
           if(pts.sep){ const A=surf(f,pts[g0]), B=surf(f,pts[g1]); if(A.front>0.05&&B.front>0.05) boltAt(A.p,B.p,Math.max(1,3.6*sc),0.25+0.55*B.front); }
           pts.forEach((u,i)=>{ const s=surf(f,u); if(pts.sep&&i>g0&&i<=g1){prev=s;return} if(prev&&s.front>0&&prev.front>0){ ctx.strokeStyle=`rgba(255,255,255,${0.25+0.55*s.front})`; ctx.lineWidth=Math.max(1,3.6*sc); ctx.beginPath(); ctx.moveTo(prev.p.x,prev.p.y); ctx.lineTo(s.p.x,s.p.y); ctx.stroke(); } prev=s; }); });
-        const k=Math.min(2.7,Math.max(1.1,sc*4.2)); // fichas com o dobro do tamanho
+        const k=Math.min(4.05,Math.max(1.65,sc*6.3)); // fichas grandes (3x o tamanho original)
         const vis=f.nodes.map(n=>({n,s:surf(f,n.u)})).filter(o=>o.s.front>0.05);
         // tamanho grande, mas encolhe só onde as fichas se encostariam
-        vis.forEach(o=>{ const p=o.n.p, t=call(p)+(p.deceased?' †':''); o.t=t; o.kk=Math.min(k, 300*sc*1.02/(t.length*9.2+26)); o.ex=fotoDe(p)?1:0; });
+        vis.forEach(o=>{ const p=o.n.p, t=call(p)+(p.deceased?' †':''); o.t=t; o.kk=Math.min(k, 450*sc*1.02/(t.length*9.2+26)); o.ex=fotoDe(p)?1:0; });
         const dims=o=>{ const h=33*Math.max(o.kk,k*0.75); return {w:(o.t.length*9.2+26)*o.kk+(o.ex?h*0.95:0),h}; };
         for(let pass=0;pass<3;pass++) for(let i=0;i<vis.length;i++) for(let j=i+1;j<vis.length;j++){ const A=vis[i], B=vis[j], da=dims(A), db=dims(B);
           const dx=Math.abs(A.s.p.x-B.s.p.x), dy=Math.abs(A.s.p.y-B.s.p.y);
