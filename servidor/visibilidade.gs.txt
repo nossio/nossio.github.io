@@ -109,7 +109,7 @@ function pedidos_(r) {
         const q = quemAutoriza_(byId, T, C, cads) || [], ok = (l.ver || {})[C.id] || [], nao = (l.naoVer || {})[C.id] || [];
         if (q.includes(eu) && !ok.includes(eu) && !nao.includes(eu)) out.push({ de: p.id, nome: p.data.name, tipo: 'verFilho', para: T.id, paraNome: T.data.name, filho: C.id, filhoNome: C.data.name, eProprio: C.id === eu, menor: menor_(C.data) });
       }); })); }
-  return out;
+  return out.concat(pedidosFoto_(r, eu));
 }
 // quem entrou nas últimas 24 h (só para o dono): some depois de um dia, ou quando o dono aprova/edita
 function novos_() {
@@ -125,6 +125,7 @@ function novos_() {
   return out.sort((a, b) => b.criado - a.criado);
 }
 function responder_(r, a) {
+  if (a.foto) return responderFoto_(r, a);
   if (a.novo) { if (r.role !== 'owner') throw new Error('Sem permissão.');
     const c = cadastros_().find(x => hash_(String(x.code)) === String(a.de)); if (!c) throw new Error('Não encontrado.');
     c.data.vistoDono = true; salvarCad_(c); return { ok: true }; }
@@ -390,3 +391,48 @@ function responderDup_(r, a) {
   const p = pessoas_().find(x => x.id === String(a.de)); if (p) { p.data.possivelDup = (p.data.possivelDup || []).filter(i => i !== String(a.para)); salvarPessoa_(p.id, p.data); }
   return { ok: true };
 }
+
+// ---------- fotos: só a própria pessoa põe a dela; 3 parentes confirmam que é ela ----------
+const FOTO_OK = 3, FOTO_NAO = 2;
+function fotosAba_() { const ss = SpreadsheetApp.getActiveSpreadsheet(); let s = ss.getSheetByName('fotos');
+  if (!s) { s = ss.insertSheet('fotos'); s.appendRow(['pessoa', 'estado', 'imagem', 'enviada', 'sim', 'nao']); } return s; }
+function fotos_() { const s = fotosAba_(), v = s.getDataRange().getValues(); const out = {};
+  for (let i = 1; i < v.length; i++) { const id = String(v[i][0]); if (!id) continue;
+    out[id] = { row: i + 1, estado: String(v[i][1]), img: String(v[i][2]), em: Number(v[i][3]) || 0, sim: JSON.parse(v[i][4] || '[]'), nao: JSON.parse(v[i][5] || '[]') }; }
+  return out; }
+function salvarFoto_(id, f) { const s = fotosAba_(), linha = [id, f.estado, f.img, f.em, JSON.stringify(f.sim || []), JSON.stringify(f.nao || [])];
+  if (f.row) s.getRange(f.row, 1, 1, 6).setValues([linha]); else s.appendRow(linha); }
+// fotos aprovadas que quem pede pode ver (mesma visibilidade da árvore)
+function fotosVer_(r) { const F = fotos_(), vis = new Set(lista_(r).filter(p => !p.data.masked && !p.data.limited).map(p => p.id));
+  const c = r.role === 'owner' ? null : cadLinha_(r.code), eu = c && c.data.personId, out = {};
+  Object.keys(F).forEach(id => { const f = F[id]; if (f.estado === 'ok' && (r.role === 'owner' || vis.has(id))) out[id] = f.img;
+    else if (id === eu && f.img) out[id] = f.img; }); // a própria pessoa vê a dela enquanto espera
+  const minha = eu && F[eu] ? { estado: F[eu].estado, sim: F[eu].sim.length, precisa: FOTO_OK } : null;
+  return { fotos: out, minha: minha }; }
+function fotoEnviar_(r, a) {
+  const c = cadLinha_(r.code), eu = c && c.data.personId; if (!eu) throw new Error('Só quem já está na árvore pode pôr a própria foto.');
+  if (c.data.pend) throw new Error('Aguarde a família confirmar você.');
+  const img = String(a.img || ''); if (!/^data:image\/jpeg;base64,/.test(img) || img.length > 48000) throw new Error('Foto inválida ou grande demais.');
+  const F = fotos_(), f = F[eu] || {}; f.estado = 'pend'; f.img = img; f.em = Date.now(); f.sim = []; f.nao = [];
+  if (eu === DONO_ID) f.estado = 'ok'; // o dono não espera confirmação
+  salvarFoto_(eu, f); return { ok: true, estado: f.estado }; }
+function fotoTirar_(r) { const c = cadLinha_(r.code), eu = c && c.data.personId; if (!eu && r.role !== 'owner') throw new Error('Sem permissão.');
+  const id = eu || DONO_ID, F = fotos_(); if (!F[id]) return { ok: true }; fotosAba_().deleteRow(F[id].row); return { ok: true }; }
+// parentes com cadastro e liberados recebem a pergunta "esta foto é mesmo de fulano?"
+function pedidosFoto_(r, eu) { const F = fotos_(), pend = Object.keys(F).filter(id => F[id].estado === 'pend'); if (!pend.length) return [];
+  const all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p.data); const out = [];
+  pend.forEach(id => { const f = F[id], P = byId[id]; if (!P || id === eu) return;
+    if (f.sim.includes(eu || 'dono') || f.nao.includes(eu || 'dono')) return;
+    if (r.role !== 'owner' && !(eu && visiveis_(all, id).has(eu) && liberados_().has(eu))) return;
+    out.push({ tipo: 'foto', de: id, nome: P.name, img: f.img, sim: f.sim.length, precisa: FOTO_OK }); });
+  return out; }
+function responderFoto_(r, a) { const c = cadLinha_(r.code), eu = r.role === 'owner' ? 'dono' : (c && c.data.personId);
+  if (!eu) throw new Error('Sem permissão.'); const F = fotos_(), f = F[a.de]; if (!f || f.estado !== 'pend') return { ok: true };
+  if (eu === a.de) throw new Error('Quem confirma são os parentes.');
+  if (r.role !== 'owner' && !visiveis_(pessoas_(), a.de).has(eu)) throw new Error('Sem permissão.');
+  if (a.sim) { if (!f.sim.includes(eu)) f.sim.push(eu); } else if (!f.nao.includes(eu)) f.nao.push(eu);
+  if (f.sim.length >= FOTO_OK) f.estado = 'ok'; else if (f.nao.length >= FOTO_NAO) f.estado = 'recusada';
+  salvarFoto_(a.de, f); return { ok: true, estado: f.estado }; }
+// ações novas (o Código.gs chama estas duas funções)
+function extra_(acao, r, a) { if (acao === 'fotos') return fotosVer_(r); }
+function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r); }

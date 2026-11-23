@@ -161,7 +161,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0820';
+const APPVER='v20261123-0900';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -328,10 +328,10 @@ async function init(){
     if(window.NOSSIO_GAS && !myCad){ showGate(); return; }
     if(window.NOSSIO_GAS && !myCad.personId){ askHow(); return; }
     if(myCad.pend){ canWrite=false; setTimeout(()=>{ if(!document.getElementById('sheet').classList.contains('on')) showWait(); },1500); }
-    else setTimeout(checkPedidos,1500);
+    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); }
   }
   const cb=document.getElementById('codeBtn'); if(cb){ cb.hidden=!(window.NOSSIO_GAS && !isOwner && !wantWrite); cb.onclick=openCode; }
-  if(isOwner && window.NOSSIO_GAS) setTimeout(checkPedidos,2500);
+  if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); }
   setStatus('Conectando…');
   const timer = setTimeout(()=>setStatus('Os dados ainda não chegaram — verifique a internet.'),10000);
   if(window.__unsub) window.__unsub();
@@ -514,8 +514,10 @@ function layout(){
   const pos={}; F.n.forEach(o=>pos[o.id]={x:o.x-minX,y:gIdx[o.g]*H});
   return {pos};
 }
+let FOTOS={}, MINHA_FOTO=null;
+const fotoDe=p=>p&&(FOTOS[p.id]||p.photo)||'';
 function avatar(p,size){const ini=(p.name||'?').trim()[0]?.toUpperCase()||'?';
-  return `<div class="av" ${size?`style="width:${size}px;height:${size}px;font-size:${size*.4}px"`:''}>${p.photo?`<img src="${p.photo}" alt="">`:esc(ini)}</div>`}
+  return `<div class="av" ${size?`style="width:${size}px;height:${size}px;font-size:${size*.4}px"`:''}>${fotoDe(p)?`<img src="${fotoDe(p)}" alt="">`:esc(ini)}</div>`}
 function lifeLine(p){const b=year(p.birth),d=year(p.death);if(p.deceased)return `${b||'?'} – ${d||'†'}`;return p.birth?fmtDate(p.birth):''}
 
 /* ---------- árvore centrada numa pessoa (como MyHeritage/FamilySearch): os dois lados juntos ---------- */
@@ -1075,11 +1077,50 @@ function mostraNovos(){ const el=document.getElementById('pNovos'); if(!el) retu
 }
 async function carregaNovos(){ if(!isOwner||!window.NOSSIO_GAS) return; try{ const l=await gas('pedidos'); novos=(l||[]).filter(x=>x.tipo==='novo'); mostraNovos(); }catch(e){} }
 setInterval(()=>{ if(isOwner&&document.visibilityState==='visible') carregaNovos(); },120000);
+
+/* ---------- fotos: só a própria pessoa põe a sua; 3 parentes confirmam ---------- */
+async function carregaFotos(){ if(!window.NOSSIO_GAS) return; try{ const r=await gas('fotos'); FOTOS=r.fotos||{}; MINHA_FOTO=r.minha||null; render(); avisoFoto(); }catch(e){} }
+function avisoFoto(){ if(isOwner||!myCad||!myCad.personId||myCad.pend) return; if(sessionStorage.getItem('nossio-semfoto')) return;
+  if(FOTOS[myCad.personId]&&(!MINHA_FOTO||MINHA_FOTO.estado!=='recusada')) return; if(MINHA_FOTO&&MINHA_FOTO.estado==='pend') return;
+  if(document.getElementById('bnFoto')) return;
+  const b=document.createElement('div'); b.id='bnFoto'; b.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:60;background:#fffdf7;border:1px solid #d8ccb4;border-radius:16px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;gap:10px;align-items:center;max-width:520px;margin:0 auto';
+  b.innerHTML='<div style="font-size:28px">📷</div><div style="flex:1;font-size:15px"><b>Coloque sua foto</b><br><span style="color:var(--muted);font-size:13px">Só você pode pôr a sua. 3 parentes confirmam que é você.</span></div><button class="btn green" id="bnFotoS">Pôr foto</button><button class="btn ghost" id="bnFotoN" aria-label="Agora não">✕</button>';
+  document.body.appendChild(b);
+  document.getElementById('bnFotoS').onclick=()=>{ b.remove(); pegarFoto(); };
+  document.getElementById('bnFotoN').onclick=()=>{ b.remove(); sessionStorage.setItem('nossio-semfoto','1'); };
+}
+function pegarFoto(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.setAttribute('capture','user');
+  inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ const img=new Image(); img.onload=()=>enquadrarFoto(img); img.src=rd.result; }; rd.readAsDataURL(f); };
+  inp.click(); }
+// recorte quadrado (arraste e zoom) antes de enviar
+function enquadrarFoto(img){ const S=280; let z=1, ox=0, oy=0; const base=Math.max(S/img.width,S/img.height);
+  openSheet(`<h2>Sua foto</h2><div class="sub">Arraste para centralizar o rosto. Use o controle para aproximar.</div>
+    <div style="display:flex;justify-content:center"><canvas id="fcv" width="${S}" height="${S}" style="border-radius:50%;touch-action:none;background:#eee;max-width:80vw"></canvas></div>
+    <input type="range" id="fz" min="1" max="3" step="0.01" value="1" style="width:100%;margin:12px 0">
+    <button class="btn green" id="fOk" style="width:100%;font-size:17px;padding:14px">Enviar minha foto</button><button class="btn ghost" id="fOutra" style="width:100%;margin-top:8px">Escolher outra</button>`);
+  const cv=document.getElementById('fcv'), cx=cv.getContext('2d');
+  const desenha=()=>{ const k=base*z, w=img.width*k, h=img.height*k; ox=Math.min(0,Math.max(S-w,ox)); oy=Math.min(0,Math.max(S-h,oy)); cx.clearRect(0,0,S,S); cx.drawImage(img,ox,oy,w,h); };
+  ox=(S-img.width*base)/2; oy=(S-img.height*base)/2; desenha();
+  let arr=null; cv.onpointerdown=e=>{ arr={x:e.clientX,y:e.clientY}; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove=e=>{ if(!arr) return; const r=S/cv.getBoundingClientRect().width; ox+=(e.clientX-arr.x)*r; oy+=(e.clientY-arr.y)*r; arr={x:e.clientX,y:e.clientY}; desenha(); };
+  cv.onpointerup=()=>{ arr=null; };
+  document.getElementById('fz').oninput=e=>{ const k0=base*z, c=S/2; const px=(c-ox)/k0, py=(c-oy)/k0; z=+e.target.value; const k=base*z; ox=c-px*k; oy=c-py*k; desenha(); };
+  document.getElementById('fOutra').onclick=()=>pegarFoto();
+  document.getElementById('fOk').onclick=async()=>{ const out=document.createElement('canvas'); out.width=out.height=240; out.getContext('2d').drawImage(cv,0,0,S,S,0,0,240,240);
+    let q=.8, url=out.toDataURL('image/jpeg',q); while(url.length>45000&&q>.3){ q-=.1; url=out.toDataURL('image/jpeg',q); }
+    try{ const r=await gas('fotoEnviar',{img:url}); FOTOS[myCad&&myCad.personId||DONO_ID]=url; MINHA_FOTO={estado:r.estado,sim:0,precisa:3}; closeSheet(); render();
+      toast(r.estado==='ok'?'Foto colocada':'Foto enviada! Aparece para todos quando 3 parentes confirmarem que é você.'); }
+    catch(e){ toast(String(e.message||'Não foi possível enviar')); } };
+}
 async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){ return; }
   if(isOwner){ novos=l.filter(x=>x.tipo==='novo'); mostraNovos(); } l=l.filter(x=>x.tipo!=='novo'); if(!l.length) return;
   const p=l[0], T={namorado:'namorado(a)',amigo:'amigo(a)'}, nxt=()=>{ closeSheet(); if(l.length>1) setTimeout(checkPedidos,400); };
   const ans=async(v,extra)=>{ try{ await gas('responder',Object.assign({de:p.de,para:p.para,aceitar:v},extra||{})); toast(v?'Feito':'Recusado'); }catch(e){ toast(String(e.message||'Não foi possível responder')); } nxt(); };
   const btns=(s,n)=>`<button class="btn green" id="pS" style="width:100%;margin-bottom:8px">${s}</button><button class="btn ghost" id="pN" style="width:100%;margin-bottom:8px">${n}</button><button class="btn ghost" id="pD" style="width:100%">Depois</button>`;
+  if(p.tipo==='foto'){
+    openSheet(`<h2>Esta foto é mesmo de ${esc(p.nome)}? 📷</h2><div style="display:flex;justify-content:center;margin:10px 0"><img src="${p.img}" alt="" style="width:200px;height:200px;border-radius:50%;object-fit:cover"></div><div class="sub" style="text-align:center">${esc(p.nome.split(' ')[0])} colocou esta foto. Ela aparece para todos quando ${p.precisa} parentes confirmarem.</div>`+btns('✓ Sim, é '+esc(p.nome.split(' ')[0]),'Não é'));
+    const fr=async v=>{ try{ await gas('responder',{foto:true,de:p.de,sim:v}); toast('Obrigado!'); }catch(e){ toast(String(e.message||'Não foi possível')); } nxt(); };
+    document.getElementById('pS').onclick=()=>fr(true); document.getElementById('pN').onclick=()=>fr(false); document.getElementById('pD').onclick=nxt; return; }
   if(p.tipo==='dup'){
     openSheet(`<h2>É a mesma pessoa? 👥</h2><div class="sub" style="font-size:16px">${p.quem?esc(p.quem)+' incluiu':'Foi incluído(a)'} <b>${esc(p.nome)}</b> (${esc(p.descNovo)}).<br><br>Já existe <b>${esc(p.paraNome)}</b> (${esc(p.descVelho)}). É a mesma pessoa?</div>
       <div class="sub" style="font-size:13px">Se for, as duas fichas viram uma só, com o nome mais completo.</div>${btns('Sim, juntar','Não, são diferentes')}`);
@@ -1186,7 +1227,8 @@ function openPerson(id){
     const f=document.getElementById('mkF'); if(f) f.onclick=async()=>{ try{ await gas('responder',{de:eu.id,para:p.id,pedeFilhos:true}); toast('Pedido enviado'); }catch(e){ toast(String(e.message||'Não foi possível')); } closeSheet(); };
     return; }
   const notes=p.notes||[];
-  let h=`<div style="text-align:center">${avatar(p,84)}</div>
+  const ehMinha=myCad&&myCad.personId===p.id||(isOwner&&p.id===DONO_ID);
+  let h=`<div style="text-align:center">${avatar(p,84)}${ehMinha?`<div><button class="btn ghost" id="bFoto" style="margin-top:6px;font-size:14px;padding:6px 12px">📷 ${fotoDe(p)?'Trocar minha foto':'Pôr minha foto'}</button></div>${MINHA_FOTO&&MINHA_FOTO.estado==='pend'?`<div class="sub" style="margin:4px 0 0">Aguardando ${MINHA_FOTO.precisa-MINHA_FOTO.sim} parente(s) confirmarem que é você</div>`:MINHA_FOTO&&MINHA_FOTO.estado==='recusada'?'<div class="sub" style="margin:4px 0 0;color:var(--red)">A família não reconheceu a foto. Tente outra.</div>':''}`:''}</div>
     <h2 style="text-align:center">${esc(p.name)}</h2>
     <div class="sub" style="text-align:center">${p.apelido?'"'+esc(p.apelido)+'" · ':''}${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>
     <div class="desc">${describe(p)}</div>`;
@@ -1205,7 +1247,7 @@ function openPerson(id){
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
-  openSheet(h);
+  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); }
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
   { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
@@ -1407,7 +1449,7 @@ function openForm(baseId,kind){
   const names = people.filter(x=>!x.unnamed).map(x=>`<option value="${esc(x.name)}">`+(x.apelido?`<option value="${esc(x.apelido)}">${esc(x.name)}</option>`:'')).join('');
   openSheet(`<h2>${title}</h2><div class="sub">${kind==='add'?'de '+esc(base.name):''}</div>
     ${rel}
-    <div class="photoEdit"><div id="fPhotoPrev">${avatar(p,64)}</div>
+    <div class="photoEdit" style="${isOwner?'':'display:none'}"><div id="fPhotoPrev">${avatar(p,64)}</div>
       <div class="row"><label class="btn ghost" style="font-size:14px;padding:8px 12px">Foto<input type="file" accept="image/*" hidden id="fPhoto"></label>
       ${p.photo?'<button class="btn ghost" style="font-size:14px;padding:8px 12px" id="fNoPhoto">Remover</button>':''}</div></div>
     <div class="field"><label>Nome completo${kind==='add'?' (pode deixar em branco se não souber)':''}</label><input id="fName" value="${esc(p.unnamed?'':p.name)}" placeholder="Nome completo"></div>
