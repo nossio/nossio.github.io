@@ -231,6 +231,9 @@ function checaSet_(r, a) {
   if (antigo && !ok.has(antigo.id)) throw new Error('Sem permissão para alterar esta pessoa.');
   const d = a.data || {};
   [d.father, d.mother, d.spouse].forEach(x => { if (x && all.some(p => p.id === x) && !ok.has(x)) throw new Error('Sem permissão para ligar a esta pessoa.'); });
+  // vínculo indestrutível: pai e mãe já ligados (com nome) só o dono troca
+  if (antigo) ['father', 'mother'].forEach(k => { const v = antigo.data[k], P = v && all.find(p => p.id === v);
+    if (P && !P.data.unnamed && d[k] !== v) throw new Error('Pai e mãe já ligados só o Ilacir pode trocar.'); });
   if (!antigo && d.name) { const dup = parecidos_(all, d); if (dup.length) d.possivelDup = dup; }
   // campos que só o servidor mexe
   ['links', 'bloqueia', 'oculto', 'saiu', 'semNome'].forEach(k => { if (antigo && antigo.data[k] !== undefined) d[k] = antigo.data[k]; else delete d[k]; });
