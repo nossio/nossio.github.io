@@ -69,7 +69,7 @@ function vincular_(r, a) {
       to.parents = [to.father, to.mother].filter(Boolean); salvarPessoa_(a.to, to);
     }
     // quem veio por convite já está confirmado por quem convidou
-    else if (rel === 'amigo' || rel === 'namorado') { const lib = !!a.convite || (!!cad.convidadoPorDono && a.to === cad.convidadoPorId); me.links = [{ type: rel, to: a.to, confirmado: lib, convite: !!a.convite }]; }
+    else if (rel === 'amigo' || rel === 'namorado') { const lib = !!a.convite || (!!cad.convidadoPorDono && a.to === cad.convidadoPorId); me.links = [{ type: rel, to: a.to, confirmado: lib, convite: !!a.convite, em: Date.now() }]; }
     me.parents = [me.father, me.mother].filter(Boolean);
     salvarPessoa_(meId, me);
   }
@@ -97,7 +97,7 @@ function pedidos_(r) {
   const all = pessoas_(), c = cadLinha_(r.code), eu = c && c.data.personId;
   const out = pedidosFamilia_(eu, r.role === 'owner').concat(r.role === 'owner' ? pedidosDup_().concat(novos_()) : []);
   all.forEach(p => (p.data.links || []).forEach(l => {
-    if (!l.confirmado && !l.recusado && l.to === eu) { // só a própria pessoa autoriza (nem o dono)
+    if (!l.confirmado && !l.recusado && (l.to === eu || (r.role === 'owner' && donoVez_(l.to, l.em || p.data.createdAt)))) { // prioridade: a própria pessoa; o dono só depois
       const alvo = all.find(x => x.id === l.to);
       out.push({ de: p.id, nome: p.data.name, tipo: l.type, para: l.to, paraNome: alvo ? alvo.data.name : '' });
     }
@@ -148,7 +148,7 @@ function responder_(r, a) {
   }
   const l = (p.data.links || []).find(x => x.to === a.para && !x.confirmado);
   if (!l) throw new Error('Pedido não encontrado.');
-  if (l.to !== eu) throw new Error('Só a própria pessoa pode responder.');
+  if (l.to !== eu && r.role !== 'owner') throw new Error('Só a própria pessoa pode responder.');
   if (a.aceitar) { l.confirmado = true; l.confirmadoEm = Date.now(); if (a.filhos) { l.pedeFilhos = true; const T = all.find(x => x.id === l.to); all.forEach(C => { if (C.data.father === l.to || C.data.mother === l.to) { l.ver = l.ver || {}; l.ver[C.id] = (l.ver[C.id] || []).concat(eu || l.to); } }); } } else { l.recusado = true; }
   salvarPessoa_(p.id, p.data);
   return { ok: true };
@@ -500,6 +500,8 @@ function cartaoEntrar_(r, a) { const lock = LockService.getScriptLock(); lock.wa
     convitesAba_().getRange(c.row, 5).setValue(agora); return { ok: true, personId: c.pessoa };
   } finally { lock.releaseLock(); } }
 // ---------- quem entrou sozinho pede para se ligar a um parente; só liga quando essa pessoa (ou o dono) autorizar ----------
+// o dono também pode autorizar, mas a vez é da pessoa: o pedido só chega a ele se ela não tem cadastro ou não respondeu em 24 h
+function donoVez_(to, em, cads) { cads = cads || comCadastro_(); return !cads.has(to) || !em || Date.now() - em > 864e5; }
 const LIGA_ = { filho: 1, pai: 1, irmao: 1, conjuge: 1 };
 function sozinho_(all, id) { const P = all.find(p => p.id === id); if (!P) return false; const d = P.data;
   if (d.father || d.mother || d.spouse) return false; return !all.some(p => p.data.father === id || p.data.mother === id || p.data.spouse === id); }
@@ -516,13 +518,13 @@ function ligarPedir_(r, a) {
 }
 function ligarCancelar_(r) { const c = cadLinha_(r.code); if (c && c.data.pedeLigar) { delete c.data.pedeLigar; salvarCad_(c); } return { ok: true }; }
 function pedidosLigar_(eu, owner) { const out = [], cads = comCadastro_();
-  cadastros_().forEach(c => { const pl = c.data.pedeLigar; if (!pl || !(pl.to === eu || (owner && !cads.has(pl.to)))) return; // o dono só autoriza por quem não tem cadastro
+  cadastros_().forEach(c => { const pl = c.data.pedeLigar; if (!pl || !(pl.to === eu || (owner && donoVez_(pl.to, pl.em, cads)))) return; // prioridade: a própria pessoa; o dono só depois
     out.push({ tipo: 'ligar', de: c.personId, nome: c.data.nome, rel: pl.rel, sexo: pl.sexo, para: pl.to, paraNome: pl.toNome }); });
   return out; }
 function responderLigar_(r, a) {
   const me = cadLinha_(r.code), eu = me && me.data.personId, owner = r.role === 'owner';
   const c = cadastros_().find(x => x.personId === String(a.de) && x.data.pedeLigar); if (!c) throw new Error('Pedido não encontrado.');
-  const pl = c.data.pedeLigar; if (!(pl.to === eu || (owner && !comCadastro_().has(pl.to)))) throw new Error('Só ' + String(pl.toNome).split(' ')[0] + ' pode autorizar.');
+  const pl = c.data.pedeLigar; if (!(pl.to === eu || owner)) throw new Error('Só ' + String(pl.toNome).split(' ')[0] + ' pode autorizar.');
   delete c.data.pedeLigar;
   if (!a.aceitar) { c.data.ligarRecusado = { toNome: pl.toNome, em: Date.now() }; salvarCad_(c); return { ok: true }; }
   const all = pessoas_(), byId = {}; all.forEach(p => byId[p.id] = p);
