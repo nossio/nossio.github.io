@@ -173,7 +173,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1345';
+const APPVER='v20261123-1350';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1208,6 +1208,11 @@ function iniciaMensagens(){ if(!window.NOSSIO_GAS||!(isOwner||(myCad&&myCad.pers
 
 /* ---------- "Você já está na árvore": convite pelo próprio cartão ---------- */
 let COMCONTA=null;
+// a ficha de quem tem cadastro é só dela (pais de menor também podem); a dos outros (falecidos, quem ainda não entrou) a família completa
+function podeCorrigir(p){ if(isOwner||!window.NOSSIO_GAS) return true; const eu=myCad&&myCad.personId; if(p.id===eu) return true;
+  if(!COMCONTA||!COMCONTA.has(p.id)) return true;
+  let men=false; if(p.birth&&!p.deceased){ const b=new Date(p.birth+'T12:00:00'), t=new Date(); let a=t.getFullYear()-b.getFullYear(); if(t<new Date(t.getFullYear(),b.getMonth(),b.getDate())) a--; men=a<18; }
+  return men&&(p.father===eu||p.mother===eu); }
 async function carregaComConta(){ if(!window.NOSSIO_GAS) return; try{ COMCONTA=new Set(await gas('comConta')); }catch(e){} }
 async function chamarPeloWhats(p){ try{ const r=await gas('cartaoCriar',{para:p.id}); const prim=(p.apelido||p.name).split(' ')[0];
     const desc=(()=>{ const f=byId(p.father), m=byId(p.mother), nm=x=>x&&!x.unnamed?(x.apelido||x.name).split(' ')[0]:''; const pais=[nm(f),nm(m)].filter(Boolean);
@@ -1371,7 +1376,7 @@ function openPerson(id){
   h+=`<div class="row" style="margin-top:16px">`;
   if(window.NOSSIO_GAS&&COMCONTA&&!COMCONTA.has(p.id)&&!p.deceased&&!p.unnamed&&!p.masked&&!p.limited&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bChama" style="background:#25a35a">📲 Chamar ${esc(call(p))} pelo WhatsApp</button><div class="sub" style="margin:-2px 0 8px;font-size:12.5px">${esc(call(p))} ainda não está no Nossio. Mande o convite: ele entra direto no próprio cartão.</div>`;
   if(window.NOSSIO_GAS&&!p.deceased&&!(myCad&&myCad.personId===p.id)&&!(isOwner&&p.id===DONO_ID)&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bMsg">💬 Mensagem para ${esc(call(p))}</button>`;
-  if(canWrite) h+=`<button class="btn green" id="bEdit">✏️ Corrigir dados</button><button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
+  if(canWrite) h+=(podeCorrigir(p)?`<button class="btn green" id="bEdit">✏️ Corrigir dados</button>`:`<div class="sub" style="margin:0 0 8px">🔒 Só ${esc(call(p))} pode corrigir a própria ficha.</div>`)+`<button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   h+=`<h3 class="h3">O que se sabe sobre ${esc(call(p))}</h3>
     ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
@@ -1391,7 +1396,7 @@ function openPerson(id){
   { const bp=document.getElementById('bPriv'); if(bp) bp.onclick=()=>myCad.personId===id?openPrivacy():hideFrom(p); }
   if(canWrite){
     document.getElementById('bAdd').onclick=()=>openAcrescentar(null,id);
-    document.getElementById('bEdit').onclick=()=>openForm(id,'edit');
+    const be=document.getElementById('bEdit'); if(be) be.onclick=()=>openForm(id,'edit');
     document.getElementById('bLink').onclick=()=>openAcrescentar(id); window.__linkVelho=()=>{openForm(id,'edit');setTimeout(()=>{const b=document.getElementById('relBox');b.closest('.field').scrollIntoView({block:'center'});b.closest('.field').style.background='var(--amber-soft)';b.closest('.field').style.borderRadius='10px';b.closest('.field').style.padding='8px'},250)};
     document.getElementById('noteAdd').onclick=async()=>{const t=document.getElementById('noteIn').value.trim();if(!t)return;
       // se a frase muda a árvore (faleceu, filho de, casado com…), vai para o Contar em vez de virar só observação
@@ -2319,12 +2324,12 @@ const Planets=(()=>{
       <div class="sub" style="margin:0">${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>
       <div class="desc curta" id="pcDesc">${describe(p)}</div><button class="btn ghost" id="pcMais" style="font-size:13px;padding:3px 10px;margin:-4px 0 8px">Ver todos os parentes ▾</button>
       ${(p.notes||[]).length?'<div class="sub" style="margin:0 0 8px">'+p.notes.map(n=>esc(n.t)).join(' · ')+'</div>':''}
-      <div class="row">${canWrite?'<button class="btn green" id="pcE">✏️ Corrigir</button><button class="btn green" id="pcL">🔗 Ligar a parente</button>':''}<button class="btn ghost" id="pcF">Ver ficha</button></div>`;
+      <div class="row">${canWrite?(podeCorrigir(p)?'<button class="btn green" id="pcE">✏️ Corrigir</button>':'')+'<button class="btn green" id="pcL">🔗 Ligar a parente</button>':''}<button class="btn ghost" id="pcF">Ver ficha</button></div>`;
     box.hidden=false;
     box.querySelectorAll('a[data-go]').forEach(a=>a.onclick=e=>{e.preventDefault(); focusPerson(a.dataset.go);});
     document.getElementById('pcX').onclick=()=>{box.hidden=true;};
     document.getElementById('pcF').onclick=()=>openPerson(id); { const dm=document.getElementById('pcMais'), dd=document.getElementById('pcDesc'); if(dm&&dd){ if(dd.scrollHeight<=dd.clientHeight+4){ dd.classList.remove('curta'); dm.remove(); } else dm.onclick=()=>{ const c=dd.classList.toggle('curta'); dm.textContent=c?'Ver todos os parentes ▾':'Mostrar menos ▴'; }; } }
-    if(canWrite){ document.getElementById('pcE').onclick=()=>openForm(id,'edit'); document.getElementById('pcL').onclick=()=>openAcrescentar(id); } }
+    if(canWrite){ const pe=document.getElementById('pcE'); if(pe) pe.onclick=()=>openForm(id,'edit'); document.getElementById('pcL').onclick=()=>openAcrescentar(id); } }
   const hideCard=()=>{ document.getElementById('pcard').hidden=true; };
   // gestos: de longe gira o sistema; de perto gira o planeta
   const ptrs=new Map(); let drag=null,pinch=null,moved=false,target=null;

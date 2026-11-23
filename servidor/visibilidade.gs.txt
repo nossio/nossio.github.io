@@ -236,6 +236,15 @@ function checaSet_(r, a) {
   // vínculo indestrutível: pai e mãe já ligados (com nome) só o dono troca
   if (antigo) ['father', 'mother'].forEach(k => { const v = antigo.data[k], P = v && all.find(p => p.id === v);
     if (P && !P.data.unnamed && d[k] !== v) throw new Error('Pai e mãe já ligados só o Ilacir pode trocar.'); });
+  // a ficha de quem tem cadastro é só dela: os outros só podem preencher um vínculo que estava vazio (pais de menor podem tudo)
+  const eu = c && c.data.personId;
+  if (antigo && antigo.id !== eu && comCadastro_().has(antigo.id) && !(menor_(antigo.data) && [antigo.data.father, antigo.data.mother].includes(eu))) {
+    const livre = new Set(['father', 'mother', 'parents', 'spouse', 'updatedBy', 'updatedByName', 'updatedAt', 'possivelDup', 'links', 'bloqueia', 'oculto', 'saiu', 'semNome']);
+    const nv = v => (v === undefined || v === null || v === '' || v === false || (Array.isArray(v) && !v.length)) ? '' : JSON.stringify(v);
+    const quem = String(antigo.data.apelido || antigo.data.name || '').split(' ')[0];
+    new Set(Object.keys(antigo.data).concat(Object.keys(d))).forEach(k => { if (!livre.has(k) && nv(antigo.data[k]) !== nv(d[k])) throw new Error('Só ' + quem + ' pode corrigir a própria ficha.'); });
+    if (antigo.data.spouse && d.spouse !== antigo.data.spouse) throw new Error('Só ' + quem + ' pode mudar o próprio cônjuge.');
+  }
   if (!antigo && d.name) { const dup = parecidos_(all, d); if (dup.length) d.possivelDup = dup; }
   // campos que só o servidor mexe
   ['links', 'bloqueia', 'oculto', 'saiu', 'semNome'].forEach(k => { if (antigo && antigo.data[k] !== undefined) d[k] = antigo.data[k]; else delete d[k]; });
