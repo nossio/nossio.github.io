@@ -148,6 +148,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 .bal small{display:block;font-size:11px;color:var(--muted);margin-top:3px;text-align:right}
 .conv{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #eee5d3;cursor:pointer}.conv .av{margin:0;width:44px;height:44px;font-size:18px}
 .desc.curta{max-height:4.9em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+.avW .av{margin:0}
 </style>
 </head>
 <body><div id="busyBar"></div>
@@ -169,7 +170,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1020';
+const APPVER='v20261123-1035';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1351,27 +1352,29 @@ function openPerson(id){
     return; }
   const notes=p.notes||[];
   const ehMinha=myCad&&myCad.personId===p.id||(isOwner&&p.id===DONO_ID);
-  let h=`<div style="text-align:center">${avatar(p,84)}${ehMinha?`<div><button class="btn ghost" id="bFoto" style="margin-top:6px;font-size:14px;padding:6px 12px">📷 ${fotoDe(p)?'Trocar minha foto':'Pôr minha foto'}</button></div>${MINHA_FOTO&&MINHA_FOTO.estado==='pend'?`<div class="sub" style="margin:4px 0 0">Aguardando ${MINHA_FOTO.precisa-MINHA_FOTO.sim} parente(s) confirmarem que é você</div>`:MINHA_FOTO&&MINHA_FOTO.estado==='recusada'?'<div class="sub" style="margin:4px 0 0;color:var(--red)">A família não reconheceu a foto. Tente outra.</div>':''}`:''}</div>
-    <h2 style="text-align:center">${esc(p.name)}</h2>
-    <div class="sub" style="text-align:center">${p.apelido?'"'+esc(p.apelido)+'" · ':''}${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>
+  let h=`<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px"><div style="flex:none" class="avW">${avatar(p,72)}</div><div style="flex:1;min-width:0">
+    <h2 style="margin:0">${esc(p.name)}</h2>
+    <div class="sub" style="margin:2px 0 0">${p.apelido?'"'+esc(p.apelido)+'" · ':''}${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>${ehMinha?`<div><button class="btn ghost" id="bFoto" style="margin-top:6px;font-size:14px;padding:6px 12px">📷 ${fotoDe(p)?'Trocar minha foto':'Pôr minha foto'}</button></div>${MINHA_FOTO&&MINHA_FOTO.estado==='pend'?`<div class="sub" style="margin:4px 0 0">Aguardando ${MINHA_FOTO.precisa-MINHA_FOTO.sim} parente(s) confirmarem que é você</div>`:MINHA_FOTO&&MINHA_FOTO.estado==='recusada'?'<div class="sub" style="margin:4px 0 0;color:var(--red)">A família não reconheceu a foto. Tente outra.</div>':''}`:''}</div></div>
     <div class="desc curta" id="pDesc">${describe(p)}</div><button class="btn ghost" id="pDescMais" style="font-size:13px;padding:4px 10px;margin:-2px 0 6px">Ver todos os parentes ▾</button>`;
   const miss=missingOf(p);
   if(isProv(p)) h+=`<div class="missing"><b>Ficha provisória.</b> ${miss.length?'Falta saber: '+esc(joinList(miss))+'.':''} Os dados ainda precisam ser confirmados.</div>`;
   else if(!F||!M) h+=`<div class="note">Falta ${!F&&!M?'pai e mãe':!F?'o pai':'a mãe'}. Toque em Editar e informe o nome — é pela filiação que o Nossio liga a família.</div>`;
-  h+=`<h3 class="h3">O que se sabe sobre ${esc(call(p))}</h3>
-    ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
-    ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
   if(window.NOSSIO_GAS&&COMCONTA&&!COMCONTA.has(p.id)&&!p.deceased&&!p.unnamed&&!p.masked&&!p.limited&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bChama" style="background:#25a35a">📲 Chamar ${esc(call(p))} pelo WhatsApp</button><div class="sub" style="margin:-2px 0 8px;font-size:12.5px">${esc(call(p))} ainda não está no Nossio. Mande o convite: ele entra direto no próprio cartão.</div>`;
   if(window.NOSSIO_GAS&&!p.deceased&&!(myCad&&myCad.personId===p.id)&&!(isOwner&&p.id===DONO_ID)&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bMsg">💬 Mensagem para ${esc(call(p))}</button>`;
   if(canWrite) h+=`<button class="btn green" id="bEdit">✏️ Corrigir dados</button><button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
+  h+=`<h3 class="h3">O que se sabe sobre ${esc(call(p))}</h3>
+    ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
+    ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
+  h+=`<details class="mais" style="margin-top:14px"><summary style="cursor:pointer;color:var(--muted);font-size:14px">⚙️ Mais opções</summary>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
   if(canWrite && !window.__root && !p.father && !p.mother && siblingsOf(p).length<=1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Mover a família de ${esc(call(p))}:</span><button class="btn ghost" id="bSideL" style="padding:8px 14px">◀ esquerda</button><button class="btn ghost" id="bSideR" style="padding:8px 14px">direita ▶</button></div>`;
   if(window.NOSSIO_GAS&&!isOwner&&myCad&&myCad.personId){ const my=myCad.personId===id;
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
+  h+=`</details>`;
   openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); } { const bc=document.getElementById('bChama'); if(bc) bc.onclick=()=>chamarPeloWhats(p); } { const dm=document.getElementById('pDescMais'), dd=document.getElementById('pDesc'); if(dm&&dd){ if(dd.scrollHeight<=dd.clientHeight+4){ dd.classList.remove('curta'); dm.remove(); } else dm.onclick=()=>{ const c=dd.classList.toggle('curta'); dm.textContent=c?'Ver todos os parentes ▾':'Mostrar menos ▴'; }; } }
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
