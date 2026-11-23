@@ -435,6 +435,32 @@ function responderFoto_(r, a) { const c = cadLinha_(r.code), eu = r.role === 'ow
   if (a.sim) { if (!f.sim.includes(eu)) f.sim.push(eu); } else if (!f.nao.includes(eu)) f.nao.push(eu);
   if (f.sim.length >= FOTO_OK) f.estado = 'ok'; else if (f.nao.length >= FOTO_NAO) f.estado = 'recusada';
   salvarFoto_(a.de, f); return { ok: true, estado: f.estado }; }
+// ---------- mensagens criptografadas de ponta a ponta ----------
+// o servidor só guarda texto embaralhado: cada aparelho tem a sua chave secreta, que nunca sai dele
+function abaCria_(nome, cab) { const ss = SpreadsheetApp.getActiveSpreadsheet(); let s = ss.getSheetByName(nome); if (!s) { s = ss.insertSheet(nome); s.appendRow(cab); } return s; }
+function quemSou_(r) { if (r.role === 'owner') return DONO_ID; const c = cadLinha_(r.code); if (!c || !c.data.personId || c.data.pend) throw new Error('Só quem já está na árvore pode mandar mensagens.'); return c.data.personId; }
+function chaves_() { const v = abaCria_('chaves', ['pessoa', 'aparelho', 'chave', 'em']).getDataRange().getValues(); const out = [];
+  for (let i = 1; i < v.length; i++) if (v[i][0]) out.push({ row: i + 1, pessoa: String(v[i][0]), dev: String(v[i][1]), pub: String(v[i][2]), em: Number(v[i][3]) || 0 }); return out; }
+function chavePub_(r, a) { const eu = quemSou_(r), dev = hash_('dev|' + r.code + '|' + String(a.n || '')), pub = String(a.pub || ''); if (!/^\{.*"kty":"EC".*\}$/.test(pub) || pub.length > 600) throw new Error('Chave inválida.');
+  const s = abaCria_('chaves', ['pessoa', 'aparelho', 'chave', 'em']), ja = chaves_().find(k => k.dev === dev);
+  if (ja) s.getRange(ja.row, 1, 1, 4).setValues([[eu, dev, pub, Date.now()]]); else s.appendRow([eu, dev, pub, Date.now()]);
+  return { dev: dev, eu: eu }; }
+function podeFalar_(r, eu, outro) { if (r.role === 'owner' || outro === DONO_ID) return true;
+  return lista_(r).some(p => p.id === outro && !p.data.masked && !p.data.limited); }
+function chavesDe_(r, a) { const eu = quemSou_(r), para = String(a.para || ''); if (!podeFalar_(r, eu, para)) throw new Error('Sem permissão.');
+  const K = chaves_(); return { para: K.filter(k => k.pessoa === para).map(k => ({ dev: k.dev, pub: k.pub })), minhas: K.filter(k => k.pessoa === eu).map(k => ({ dev: k.dev, pub: k.pub })) }; }
+function msgEnviar_(r, a) { const eu = quemSou_(r), para = String(a.para || ''); if (!para || para === eu) throw new Error('Para quem?');
+  if (!podeFalar_(r, eu, para)) throw new Error('Sem permissão.');
+  const env = JSON.stringify(a.env || {}); if (env.length > 45000) throw new Error('Mensagem grande demais.');
+  const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), em = Date.now();
+  abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']).appendRow([id, eu, para, em, env, '']); return { id: id, em: em }; }
+function msgs_(r, a) { const eu = quemSou_(r), desde = Number(a.desde) || 0, v = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']).getDataRange().getValues(), out = [];
+  for (let i = 1; i < v.length; i++) { const de = String(v[i][1]), para = String(v[i][2]), em = Number(v[i][3]) || 0;
+    if ((de === eu || para === eu) && em > desde) out.push({ id: String(v[i][0]), de: de, para: para, em: em, env: JSON.parse(v[i][4] || '{}'), lida: !!v[i][5] }); }
+  return { eu: eu, msgs: out, agora: Date.now() }; }
+function msgLida_(r, a) { const eu = quemSou_(r), de = String(a.de || ''), s = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']), v = s.getDataRange().getValues();
+  for (let i = 1; i < v.length; i++) if (String(v[i][1]) === de && String(v[i][2]) === eu && !v[i][5]) s.getRange(i + 1, 6).setValue(Date.now()); return { ok: true }; }
 // ações novas (o Código.gs chama estas duas funções)
-function extra_(acao, r, a) { if (acao === 'fotos') return fotosVer_(r); }
-function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r); }
+function extra_(acao, r, a) { if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); }
+function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r);
+  if (acao === 'chavePub') return chavePub_(r, a); if (acao === 'msgEnviar') return msgEnviar_(r, a); if (acao === 'msgLida') return msgLida_(r, a); }

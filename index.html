@@ -140,10 +140,17 @@ button:active,.btn:active,.hb:active{transform:scale(.94);filter:brightness(.85)
 #busyBar{position:fixed;top:0;left:0;height:3px;width:100%;z-index:9999;pointer-events:none;background:linear-gradient(90deg,transparent,#3d6b4f,#e0a43a,transparent);background-size:50% 100%;background-repeat:no-repeat;opacity:0;transition:opacity .2s}
 @keyframes busyfx{0%{background-position:-50% 0}100%{background-position:150% 0}}
 body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
+
+.msgN{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:#c0392b;color:#fff;font-size:11px;padding:0 5px;margin-left:4px;vertical-align:2px}
+.chat{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto;padding:4px 2px;margin:6px 0}
+.bal{max-width:80%;padding:8px 11px;border-radius:14px;font-size:15px;line-height:1.35;white-space:pre-wrap;word-wrap:break-word}
+.bal.eu{align-self:flex-end;background:#dcefd9;border-bottom-right-radius:4px}.bal.ele{align-self:flex-start;background:#f1ece2;border-bottom-left-radius:4px}
+.bal small{display:block;font-size:11px;color:var(--muted);margin-top:3px;text-align:right}
+.conv{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #eee5d3;cursor:pointer}.conv .av{margin:0;width:44px;height:44px;font-size:18px}
 </style>
 </head>
 <body><div id="busyBar"></div>
-<header><div class="hTop"><h1>Nossi<span>o</span></h1><div class="vSeg"><button id="vTree" class="on" title="Planta">🌳<span class="lg"> Planta</span></button><button id="vPlan" title="Planetas">🪐<span class="lg"> Planetas</span></button></div><span class="tag">ENSAIO</span><div class="hBtns"><button class="hb big" id="tellBtn" title="Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore." hidden style="background:var(--green,#2e6b4f);color:#fff;border-color:transparent"><b>✍️ Contar</b><small>Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore.</small></button><button class="hb big" id="incBtn" title="Acrescente alguém ou ligue a um parente que já está no Nossio." hidden><b>➕ Acrescentar<span class="lg"> pessoa</span></b><small>Escolha um parente que já está na árvore e diga quem é a pessoa nova.</small></button><button class="hb big" id="findBtn" title="Procure alguém e vá direto até a pessoa na árvore." hidden><b>🎯<span class="lg2"> Centralizar</span></b><small>Procure alguém e vá direto até a pessoa na árvore.</small></button><button class="hb" id="askBtn" hidden>❓ Perguntar</button><button class="hb" id="kinBtn" hidden>🔀 Comparar</button><button class="hb" id="newsBtn" hidden>🔔 Novidades</button><button class="hb" id="dupBtn" hidden>👥 Duplicados</button><button class="hb" id="invBtn" hidden>💌 Convidar</button><button class="hb" id="codeBtn" hidden>🔑 Tenho um código</button></div></div>
+<header><div class="hTop"><h1>Nossi<span>o</span></h1><div class="vSeg"><button id="vTree" class="on" title="Planta">🌳<span class="lg"> Planta</span></button><button id="vPlan" title="Planetas">🪐<span class="lg"> Planetas</span></button></div><span class="tag">ENSAIO</span><div class="hBtns"><button class="hb big" id="tellBtn" title="Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore." hidden style="background:var(--green,#2e6b4f);color:#fff;border-color:transparent"><b>✍️ Contar</b><small>Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore.</small></button><button class="hb big" id="incBtn" title="Acrescente alguém ou ligue a um parente que já está no Nossio." hidden><b>➕ Acrescentar<span class="lg"> pessoa</span></b><small>Escolha um parente que já está na árvore e diga quem é a pessoa nova.</small></button><button class="hb big" id="findBtn" title="Procure alguém e vá direto até a pessoa na árvore." hidden><b>🎯<span class="lg2"> Centralizar</span></b><small>Procure alguém e vá direto até a pessoa na árvore.</small></button><button class="hb" id="askBtn" hidden>❓ Perguntar</button><button class="hb" id="kinBtn" hidden>🔀 Comparar</button><button class="hb" id="newsBtn" hidden>🔔 Novidades</button><button class="hb" id="dupBtn" hidden>👥 Duplicados</button><button class="hb" id="msgBtn" hidden title="Mensagens com a família — só quem recebe consegue ler">💬<span class="lg"> Mensagens</span><b id="msgN" class="msgN" hidden></b></button><button class="hb" id="invBtn" hidden>💌 Convidar</button><button class="hb" id="codeBtn" hidden>🔑 Tenho um código</button></div></div>
 </header>
 <div class="status" id="status">Carregando…</div>
 <div id="cadBar" hidden style="margin:0 16px 8px;padding:10px 12px;border:1px solid #e0c48a;background:#fff6e3;border-radius:12px;font-size:14px;display:flex;gap:10px;align-items:center"><span style="flex:1">Falta pouco: diga quem você é na árvore e complete o cadastro.</span><button class="btn green" id="cadBtn" style="padding:8px 14px">Completar</button></div>
@@ -161,7 +168,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0925';
+const APPVER='v20261123-0940';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -328,10 +335,10 @@ async function init(){
     if(window.NOSSIO_GAS && !myCad){ showGate(); return; }
     if(window.NOSSIO_GAS && !myCad.personId){ askHow(); return; }
     if(myCad.pend){ canWrite=false; setTimeout(()=>{ if(!document.getElementById('sheet').classList.contains('on')) showWait(); },1500); }
-    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); }
+    else { setTimeout(checkPedidos,1500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); }
   }
   const cb=document.getElementById('codeBtn'); if(cb){ cb.hidden=!(window.NOSSIO_GAS && !isOwner && !wantWrite); cb.onclick=openCode; }
-  if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); }
+  if(isOwner && window.NOSSIO_GAS){ setTimeout(checkPedidos,2500); setTimeout(carregaFotos,1200); setTimeout(iniciaMensagens,2000); }
   setStatus('Conectando…');
   const timer = setTimeout(()=>setStatus('Os dados ainda não chegaram — verifique a internet.'),10000);
   if(window.__unsub) window.__unsub();
@@ -557,7 +564,7 @@ function render(){
     const b=document.getElementById('stAll'); if(b) b.onclick=e=>{ e.preventDefault(); verTodos=true; userMoved=false; render(); };
   }
 }
-function atualizaBotoes(){ const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = true; /* Contar aposentado: tudo pelo ➕ Acrescentar */ }
+function atualizaBotoes(){ const pendM=!!(myCad&&myCad.pend); document.getElementById('incBtn').hidden = pendM || !((canWrite||window.NOSSIO_GAS) && people.length); document.getElementById('dupBtn').hidden = !(isOwner && canWrite && people.length>=2); updNewsBtn(); document.getElementById('kinBtn').hidden = people.length<2; document.getElementById('findBtn').hidden = people.length<2; document.getElementById('invBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId))); document.getElementById('msgBtn').hidden = !(window.NOSSIO_GAS && (isOwner || (myCad&&myCad.personId&&!myCad.pend))); document.getElementById('askBtn').hidden = !(askReady && people.length>=2); document.getElementById('tellBtn').hidden = true; /* Contar aposentado: tudo pelo ➕ Acrescentar */ }
 function renderPlanta(){
   const tree=document.getElementById('tree'), empty=document.getElementById('emptyBox'), fab=document.getElementById('fab');
   fab.hidden = true; atualizaBotoes();
@@ -1112,6 +1119,77 @@ function enquadrarFoto(img){ const S=280; let z=1, ox=0, oy=0; const base=Math.m
       toast(r.estado==='ok'?'Foto colocada':'Foto enviada! Aparece para todos quando 3 parentes confirmarem que é você.'); }
     catch(e){ toast(String(e.message||'Não foi possível enviar')); } };
 }
+
+/* ---------- 💬 mensagens criptografadas de ponta a ponta ----------
+   Cada aparelho cria a própria chave (ECDH P-256) e guarda a parte secreta só nele.
+   Cada mensagem é trancada com uma chave nova (AES-GCM); essa chave vai trancada para cada aparelho de quem recebe e de quem envia.
+   A planilha só recebe texto embaralhado. */
+const E2E={ k:null, dev:null, pubTxt:'', cache:{}, msgs:[], desde:0, eu:null, timer:null, aberta:null };
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b))), unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function e2eChave(){ if(E2E.k) return E2E.k; const sub=crypto.subtle; let g=null; try{ g=JSON.parse(localStorage.getItem('nossio-e2e')||'null'); }catch(e){}
+  const quem=isOwner?'dono':(myCad&&myCad.personId)||'';
+  if(!g||!g.priv||g.quem!==quem){ const kp=await sub.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+    g={priv:await sub.exportKey('jwk',kp.privateKey),pub:await sub.exportKey('jwk',kp.publicKey),quem:quem}; }
+  if(!g.dev){ const pubTxt=JSON.stringify({kty:g.pub.kty,crv:g.pub.crv,x:g.pub.x,y:g.pub.y}); g.n=g.n||Math.random().toString(36).slice(2,12); const r=await gas('chavePub',{pub:pubTxt,n:g.n}); g.dev=r.dev; }
+  try{ localStorage.setItem('nossio-e2e',JSON.stringify(g)); }catch(e){}
+  E2E.k=await sub.importKey('jwk',g.priv,{name:'ECDH',namedCurve:'P-256'},false,['deriveKey']); E2E.dev=g.dev; E2E.pubTxt=JSON.stringify({kty:g.pub.kty,crv:g.pub.crv,x:g.pub.x,y:g.pub.y}); return E2E.k; }
+async function e2eSegredo(pubTxt){ const pub=await crypto.subtle.importKey('jwk',JSON.parse(pubTxt),{name:'ECDH',namedCurve:'P-256'},false,[]);
+  return crypto.subtle.deriveKey({name:'ECDH',public:pub},await e2eChave(),{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
+async function e2eTrancar(texto,para){ await e2eChave(); const sub=crypto.subtle, ch=await gas('chaves',{para});
+  if(!ch.para.length) throw new Error('semChave');
+  const K=crypto.getRandomValues(new Uint8Array(32)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const kk=await sub.importKey('raw',K,'AES-GCM',false,['encrypt']), ct=await sub.encrypt({name:'AES-GCM',iv},kk,new TextEncoder().encode(texto));
+  const env={v:1,iv:b64(iv),ct:b64(ct),sdev:E2E.dev,spub:E2E.pubTxt,k:{}};
+  for(const d of [...ch.para,...ch.minhas]){ const s2=await e2eSegredo(d.pub), iv2=crypto.getRandomValues(new Uint8Array(12)); env.k[d.dev]={iv:b64(iv2),w:b64(await sub.encrypt({name:'AES-GCM',iv:iv2},s2,K))}; }
+  return env; }
+async function e2eAbrir(m){ if(E2E.cache[m.id]!==undefined) return E2E.cache[m.id]; let t=null;
+  try{ await e2eChave(); const e=m.env, mine=e.k&&e.k[E2E.dev]; if(mine){ const sub=crypto.subtle, s2=await e2eSegredo(e.spub);
+      const K=await sub.decrypt({name:'AES-GCM',iv:unb64(mine.iv)},s2,unb64(mine.w)); const kk=await sub.importKey('raw',K,'AES-GCM',false,['decrypt']);
+      t=new TextDecoder().decode(await sub.decrypt({name:'AES-GCM',iv:unb64(e.iv)},kk,unb64(e.ct))); } }catch(err){ t=null; }
+  E2E.cache[m.id]=t; return t; }
+async function msgBuscar(){ if(!window.NOSSIO_GAS) return; try{ await e2eChave(); const r=await gas('msgs',{desde:E2E.desde}); E2E.eu=r.eu;
+    const ids=new Set(E2E.msgs.map(m=>m.id)); r.msgs.forEach(m=>{ if(!ids.has(m.id)) E2E.msgs.push(m); else { const x=E2E.msgs.find(y=>y.id===m.id); x.lida=m.lida; } });
+    if(r.msgs.length) E2E.desde=Math.max(E2E.desde,...r.msgs.map(m=>m.em)); msgBadge(); if(E2E.aberta) desenhaChat(); }catch(e){} }
+function msgBadge(){ const n=E2E.msgs.filter(m=>m.para===E2E.eu&&!m.lida).length, b=document.getElementById('msgN'); if(!b) return; b.hidden=!n; b.textContent=n; }
+function nomeDe(id){ const p=byId(id); return p?(p.apelido||p.name):'Alguém'; }
+function hora(t){ const d=new Date(t), h=new Date(); return d.toDateString()===h.toDateString()?d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+async function abrirConversas(){ E2E.aberta=null; await msgBuscar(); const por={};
+  E2E.msgs.forEach(m=>{ const o=m.de===E2E.eu?m.para:m.de; (por[o]=por[o]||[]).push(m); });
+  const lista=Object.keys(por).map(o=>({o,ult:por[o][por[o].length-1],n:por[o].filter(m=>m.para===E2E.eu&&!m.lida).length})).sort((a,b)=>b.ult.em-a.ult.em);
+  openSheet(`<h2>💬 Mensagens</h2><div class="sub">🔒 Criptografadas de ponta a ponta: só você e quem recebe conseguem ler.</div>
+    <button class="btn green" id="mNova" style="width:100%;margin:6px 0 10px">✏️ Nova mensagem</button>
+    ${lista.length?lista.map(c=>`<div class="conv" data-o="${c.o}">${avatar(byId(c.o)||{name:'?'})}<div style="flex:1"><b>${esc(nomeDe(c.o))}</b><div class="sub" style="margin:0">${hora(c.ult.em)}</div></div>${c.n?`<b class="msgN">${c.n}</b>`:''}</div>`).join(''):'<div class="sub">Nenhuma conversa ainda. Toque em "Nova mensagem" ou no cartão de um parente.</div>'}`);
+  document.querySelectorAll('.conv').forEach(d=>d.onclick=()=>abrirChat(d.dataset.o));
+  document.getElementById('mNova').onclick=()=>{ openSheet(`<h2>Para quem?</h2><input id="mQ" class="inp cad" placeholder="Digite o nome" autocomplete="off"><div id="mL"></div>`);
+    const q=document.getElementById('mQ'), L=document.getElementById('mL'); q.focus();
+    q.oninput=()=>{ const n=nrm(q.value); if(n.length<2){ L.innerHTML=''; return; } const ws=n.split(' ');
+      const l=people.filter(p=>!p.unnamed&&!p.masked&&!p.limited&&!p.fora&&!p.deceased&&p.id!==E2E.eu&&ws.every(w=>nrm(p.name+' '+(p.apelido||'')).split(' ').some(x=>x.startsWith(w)))).slice(0,8);
+      L.innerHTML=l.map(p=>`<button class="btn ghost" data-p="${p.id}" style="display:block;width:100%;text-align:left;margin:4px 0">${esc(p.name)}</button>`).join('');
+      L.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>abrirChat(b.dataset.p)); }; };
+}
+async function abrirChat(outro){ E2E.aberta=outro; const p=byId(outro)||{name:'?'};
+  openSheet(`<h2 style="display:flex;align-items:center;gap:10px">${avatar(p,40)}<span>${esc(nomeDe(outro))}</span></h2><div class="sub">🔒 Só vocês dois conseguem ler.</div>
+    <div class="chat" id="mChat"><div class="sub">Carregando…</div></div>
+    <div style="display:flex;gap:6px"><textarea id="mTxt" class="inp" rows="2" placeholder="Escreva sua mensagem" style="flex:1;resize:none"></textarea><button class="btn green" id="mEnv">Enviar</button></div>
+    <div id="mErr" style="color:var(--red);font-size:14px;min-height:18px"></div><button class="btn ghost" id="mVolta" style="width:100%">← Conversas</button>`);
+  document.getElementById('mVolta').onclick=abrirConversas;
+  const env=async()=>{ const t=document.getElementById('mTxt'), tx=t.value.trim(); if(!tx) return; const er=document.getElementById('mErr'); er.textContent='';
+    try{ const e=await e2eTrancar(tx,outro); const r=await gas('msgEnviar',{para:outro,env:e}); const m={id:r.id,de:E2E.eu,para:outro,em:r.em,env:e,lida:false}; E2E.cache[r.id]=tx; E2E.msgs.push(m); t.value=''; desenhaChat(); }
+    catch(e){ er.textContent=String(e.message)==='semChave'?`${nomeDe(outro)} ainda não abriu esta versão do Nossio. Quando abrir, você já consegue mandar.`:'Não foi possível enviar: '+(e.message||e); } };
+  document.getElementById('mEnv').onclick=env;
+  document.getElementById('mTxt').onkeydown=e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); env(); } };
+  await msgBuscar(); desenhaChat();
+  if(E2E.msgs.some(m=>m.de===outro&&m.para===E2E.eu&&!m.lida)){ try{ await gas('msgLida',{de:outro}); E2E.msgs.forEach(m=>{ if(m.de===outro) m.lida=true; }); msgBadge(); }catch(e){} }
+}
+async function desenhaChat(){ const box=document.getElementById('mChat'), o=E2E.aberta; if(!box||!o) return;
+  const l=E2E.msgs.filter(m=>(m.de===o&&m.para===E2E.eu)||(m.para===o&&m.de===E2E.eu)).sort((a,b)=>a.em-b.em);
+  const partes=[]; for(const m of l){ const t=await e2eAbrir(m); partes.push(`<div class="bal ${m.de===E2E.eu?'eu':'ele'}">${t===null?'<i>🔒 Mensagem trancada para outro aparelho</i>':esc(t)}<small>${hora(m.em)}${m.de===E2E.eu&&m.lida?' ✓✓':''}</small></div>`); }
+  const fim=box.scrollTop+box.clientHeight>=box.scrollHeight-20; box.innerHTML=partes.join('')||'<div class="sub">Nenhuma mensagem ainda. Diga um oi!</div>'; if(fim||true) box.scrollTop=box.scrollHeight;
+  if(l.some(m=>m.de===o&&!m.lida)){ gas('msgLida',{de:o}).then(()=>{ E2E.msgs.forEach(m=>{ if(m.de===o) m.lida=true; }); msgBadge(); }).catch(()=>{}); } }
+function iniciaMensagens(){ if(!window.NOSSIO_GAS||!(isOwner||(myCad&&myCad.personId&&!myCad.pend))) return; if(!window.crypto||!crypto.subtle) return;
+  const b=document.getElementById('msgBtn'); if(b) b.onclick=abrirConversas;
+  msgBuscar(); clearInterval(E2E.timer); E2E.timer=setInterval(()=>{ if(document.visibilityState==='visible') msgBuscar(); },E2E.aberta?6000:20000);
+  setInterval(()=>{ if(E2E.aberta&&document.visibilityState==='visible'&&document.getElementById('mChat')) msgBuscar(); else if(!document.getElementById('mChat')) E2E.aberta=null; },6000); }
 async function checkPedidos(){ let l=[]; try{ l=await gas('pedidos'); }catch(e){ return; }
   if(isOwner){ novos=l.filter(x=>x.tipo==='novo'); mostraNovos(); } l=l.filter(x=>x.tipo!=='novo'); if(!l.length) return;
   const p=l[0], T={namorado:'namorado(a)',amigo:'amigo(a)'}, nxt=()=>{ closeSheet(); if(l.length>1) setTimeout(checkPedidos,400); };
@@ -1156,7 +1234,7 @@ function openCode(){
     if(!m||m.role==='view'){ if(old) LSset(CODEKEY,old); else LSdel(CODEKEY); ME=null; document.getElementById('codeErr').textContent='Código não encontrado. Confira com o Ilacir.'; return; }
     closeSheet(); toast(m.role==='owner'?'Bem-vindo, administrador':'Código aceito'); init(); };
 }
-function openSheet(h){document.getElementById('sheetBody').innerHTML=h;document.getElementById('sheet').classList.add('on');document.getElementById('scrim').classList.add('on')}
+function openSheet(h){ { const bf=document.getElementById('bnFoto'); if(bf) bf.remove(); }document.getElementById('sheetBody').innerHTML=h;document.getElementById('sheet').classList.add('on');document.getElementById('scrim').classList.add('on')}
 function closeSheet(){document.getElementById('sheet').classList.remove('on');document.getElementById('scrim').classList.remove('on')}
 document.getElementById('scrim').onclick=()=>{ if(!document.body.classList.contains('gated')) closeSheet(); };
 document.getElementById('invBtn').onclick=()=>showInvite();
@@ -1239,6 +1317,7 @@ function openPerson(id){
     ${notes.length?'<ul class="notes">'+notes.map(n=>`<li>${esc(n.t)}<small>${n.by?'contado por '+esc(n.by)+' · ':''}${n.at?fmtDate(n.at):''}</small></li>`).join('')+'</ul>':'<div class="sub">Nenhuma informação ainda. Ex.: onde nasceu, onde mora, profissão, como era conhecido.</div>'}
     ${canWrite?`<div class="row" style="flex-wrap:nowrap"><input id="noteIn" class="inp" placeholder="Nova informação…"><button class="btn ghost" id="noteAdd">+</button></div>`:''}`;
   h+=`<div class="row" style="margin-top:16px">`;
+  if(window.NOSSIO_GAS&&!p.deceased&&!(myCad&&myCad.personId===p.id)&&!(isOwner&&p.id===DONO_ID)&&(isOwner||(myCad&&myCad.personId&&!myCad.pend))) h+=`<button class="btn green" id="bMsg">💬 Mensagem para ${esc(call(p))}</button>`;
   if(canWrite) h+=`<button class="btn green" id="bEdit">✏️ Corrigir dados</button><button class="btn green" id="bLink">🔗 Ligar a um parente</button><button class="btn green" id="bAdd">➕ Acrescentar parente de ${esc(call(p))}</button>`;
   h+=`<button class="btn green" id="bTree">🌳 Ver a árvore de ${esc(call(p))}</button><button class="btn ghost" id="bCenter">🎯 Centralizar</button><button class="btn ghost" id="bKin">Comparar</button></div>`;
   if(canWrite && siblingsOf(p).length>1) h+=`<div class="row" style="margin-top:10px;align-items:center"><span class="sub" style="margin:0">Posição entre os irmãos:</span><button class="btn ghost" id="bLeft" style="padding:8px 14px">◀</button><button class="btn ghost" id="bRight" style="padding:8px 14px">▶</button><button class="btn ghost" id="bAge" style="padding:8px 12px;font-size:14px">Ordenar por idade</button></div>`;
@@ -1247,7 +1326,7 @@ function openPerson(id){
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
-  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); }
+  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); }
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
   { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
