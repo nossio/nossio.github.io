@@ -149,7 +149,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0800';
+const APPVER='v20261123-0810';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -963,8 +963,12 @@ async function doLink(a,nome){
   if(['eu','filho','irmao','conjuge'].includes(a.rel)&&!a.convite&&!window.__porDono) return showWait(nome);
   const pend=(a.rel==='namorado'||a.rel==='amigo')&&!a.convite;
   // primeiro a pessoa vê a árvore; o convite fica num aviso pequeno embaixo, que não tapa nada
-  closeSheet(); userMoved=false; render();
-  return bannerConvite(pend?`❤️ Pedido enviado: vocês aparecem ligados quando ${esc(nome.split(' ')[0])} aceitar.`:a.rel==='conhecer'?'🌱 Sua árvore começou! Inclua seus parentes em ➕ Incluir.':'🎉 Pronto! Esta é a sua árvore: você está no centro, com seus pais, irmãos, filhos e primos. Toque em qualquer pessoa para ver mais. Em 🪐 você vê todas as famílias.');
+  closeSheet(); userMoved=false;
+  // quem acabou de entrar vira o centro: a árvore dela, centrada nela, com a ficha aberta
+  const meId=myCad&&myCad.personId||null;
+  if(meId){ treeRoot=meId; verTodos=false; if(typeof viewMode!=='undefined'&&viewMode==='plan') setView('tree'); }
+  render(); if(meId){ let t=0; const vai=()=>{ if(byId(meId)){ render(); centerOn(meId); openPerson(meId); } else if(++t<20) setTimeout(vai,300); }; setTimeout(vai,450); }
+  return bannerConvite(pend?`❤️ Pedido enviado: vocês aparecem ligados quando ${esc(nome.split(' ')[0])} aceitar.`:a.rel==='conhecer'?'🌱 Sua árvore começou! Esta é a sua ficha — acrescente seus parentes em ➕ Acrescentar.':'🎉 Pronto! Esta é a sua ficha — você é o centro da árvore. Confira seus dados em ✏️ Corrigir e ligue quem faltar em 🔗 Ligar a um parente.');
   showInvite(pend?`<h2>Pedido enviado ❤️</h2><div class="sub">Vocês vão aparecer ligados quando <b>${esc(nome)}</b> aceitar. Mande o link para ${esc(nome)} entrar no Nossio e confirmar:</div>`
     : a.rel==='conhecer'?`<h2>Sua árvore começou! 🌱</h2><div class="sub">Agora é só incluir os seus parentes em <b>➕ Incluir</b>. E chame quem você quiser — mande este link:</div>`
     : `<h2>Pronto! 🎉</h2><div class="sub">Você já está na árvore. Inclua quem estiver faltando em <b>➕ Incluir</b> e chame a família — mande este link:</div>`);
