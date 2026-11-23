@@ -128,9 +128,21 @@ body.gated #scrim{background:#f5efe3;opacity:1;pointer-events:none}
 body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 .bnconv{position:fixed;left:12px;right:12px;bottom:14px;z-index:40;background:#fffdf7;border:1.5px solid var(--line);border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:12px 14px;max-width:520px;margin:0 auto}.bnconv .bt{font-size:15px;margin-bottom:8px}.bnconv .bb{display:flex;gap:8px}.bnconv .bb .btn{flex:1;padding:10px}.bnconv.min .bt{display:none}
 .regras{margin-top:14px;padding:10px 12px;background:#efe7d6;border-radius:10px;font-size:13px;line-height:1.4}.regras ul{margin:6px 0 0 18px;padding:0}.regras li{margin:3px 0}
+
+/* toque nos botões: afunda, pisca e, se for ao servidor, mostra que está trabalhando */
+button,.btn,.hb{transition:transform .08s ease,filter .08s ease,box-shadow .08s ease;-webkit-tap-highlight-color:transparent}
+button:active,.btn:active,.hb:active{transform:scale(.94);filter:brightness(.85)}
+@keyframes tapfx{0%{box-shadow:0 0 0 0 rgba(61,107,79,.55)}100%{box-shadow:0 0 0 14px rgba(61,107,79,0)}}
+.tapfx{animation:tapfx .45s ease-out}
+@keyframes girafx{to{transform:rotate(360deg)}}
+.trab{position:relative;pointer-events:none;opacity:.75}
+.trab::after{content:"";display:inline-block;width:.9em;height:.9em;margin-left:.5em;vertical-align:-.12em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:girafx .7s linear infinite}
+#busyBar{position:fixed;top:0;left:0;height:3px;width:100%;z-index:9999;pointer-events:none;background:linear-gradient(90deg,transparent,#3d6b4f,#e0a43a,transparent);background-size:50% 100%;background-repeat:no-repeat;opacity:0;transition:opacity .2s}
+@keyframes busyfx{0%{background-position:-50% 0}100%{background-position:150% 0}}
+body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 </style>
 </head>
-<body>
+<body><div id="busyBar"></div>
 <header><div class="hTop"><h1>Nossi<span>o</span></h1><div class="vSeg"><button id="vTree" class="on" title="Planta">🌳<span class="lg"> Planta</span></button><button id="vPlan" title="Planetas">🪐<span class="lg"> Planetas</span></button></div><span class="tag">ENSAIO</span><div class="hBtns"><button class="hb big" id="tellBtn" title="Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore." hidden style="background:var(--green,#2e6b4f);color:#fff;border-color:transparent"><b>✍️ Contar</b><small>Escreva o que você sabe, do seu jeito: “Carol é filha de Jacy e Márcia”, “Warley faleceu”. O Nossio monta a árvore.</small></button><button class="hb big" id="incBtn" title="Acrescente alguém ou ligue a um parente que já está no Nossio." hidden><b>➕ Acrescentar<span class="lg"> pessoa</span></b><small>Escolha um parente que já está na árvore e diga quem é a pessoa nova.</small></button><button class="hb big" id="findBtn" title="Procure alguém e vá direto até a pessoa na árvore." hidden><b>🎯<span class="lg2"> Centralizar</span></b><small>Procure alguém e vá direto até a pessoa na árvore.</small></button><button class="hb" id="askBtn" hidden>❓ Perguntar</button><button class="hb" id="kinBtn" hidden>🔀 Comparar</button><button class="hb" id="newsBtn" hidden>🔔 Novidades</button><button class="hb" id="dupBtn" hidden>👥 Duplicados</button><button class="hb" id="invBtn" hidden>💌 Convidar</button><button class="hb" id="codeBtn" hidden>🔑 Tenho um código</button></div></div>
 </header>
 <div class="status" id="status">Carregando…</div>
@@ -149,7 +161,7 @@ body.gated .sheet{max-height:100vh;height:100vh;border-radius:0}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0810';
+const APPVER='v20261123-0820';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -162,7 +174,12 @@ setInterval(checaVersao,180000);
 const CODEKEY='nossio-code'; let MEMCODE='';
 const LSget=k=>{try{return localStorage.getItem(k)}catch(e){return k===CODEKEY?MEMCODE:null}}, LSset=(k,v)=>{if(k===CODEKEY)MEMCODE=v; try{localStorage.setItem(k,v)}catch(e){}}, LSdel=k=>{if(k===CODEKEY)MEMCODE=''; try{localStorage.removeItem(k)}catch(e){}};
 const API='https://script.google.com/macros/s/AKfycbwcTs1peEwuO-V6V8xegz2Wod2MTj91sXOXKCrycDWgBuFiNZTsaJZWupC_0t2DZJVGtA/exec';
-const gas=async(action,a)=>{ let r; try{ r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:action,codigo:LSget(CODEKEY)||'',a:a||null}),redirect:'follow',credentials:'omit'}).then(x=>x.json()); }catch(e){ const er=new Error('sem conexão'); er.code='unavailable'; throw er; }
+let ultBotao=null, ocup=0;
+document.addEventListener('pointerdown',e=>{ const b=e.target.closest&&e.target.closest('button,.btn,.hb'); if(!b) return; ultBotao=b; b.classList.remove('tapfx'); void b.offsetWidth; b.classList.add('tapfx'); setTimeout(()=>b.classList.remove('tapfx'),500); },true);
+document.addEventListener('DOMContentLoaded',()=>{ if(!document.getElementById('busyBar')){ const d=document.createElement('div'); d.id='busyBar'; document.body.appendChild(d); } });
+const gas=async(action,a)=>{ const bt=(ultBotao&&document.body.contains(ultBotao))?ultBotao:null; ultBotao=null; ocup++; document.body.classList.add('ocupado'); if(bt) bt.classList.add('trab');
+  try{ return await gas0(action,a); } finally { if(bt) bt.classList.remove('trab'); if(--ocup<=0){ ocup=0; document.body.classList.remove('ocupado'); } } };
+const gas0=async(action,a)=>{ let r; try{ r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:action,codigo:LSget(CODEKEY)||'',a:a||null}),redirect:'follow',credentials:'omit'}).then(x=>x.json()); }catch(e){ const er=new Error('sem conexão'); er.code='unavailable'; throw er; }
   if(!r.ok){ const er=new Error(r.erro||'erro'); er.code='permission'; throw er; } return r.r; };
 let ME=null; const meP=()=>ME?Promise.resolve(ME):gas('me').then(m=>ME=m);
 const GDB={collection:(c)=>({
