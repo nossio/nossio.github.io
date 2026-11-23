@@ -406,14 +406,14 @@ function salvarFoto_(id, f) { const s = fotosAba_(), linha = [id, f.estado, f.im
   if (f.row) s.getRange(f.row, 1, 1, 6).setValues([linha]); else s.appendRow(linha); }
 // fotos aprovadas que quem pede pode ver (mesma visibilidade da árvore)
 function fotosVer_(r) { const F = fotos_(), vis = new Set(lista_(r).filter(p => !p.data.masked && !p.data.limited).map(p => p.id));
-  const c = r.role === 'owner' ? null : cadLinha_(r.code), eu = c && c.data.personId, out = {};
+  const c = r.role === 'owner' ? null : cadLinha_(r.code), eu = r.role === 'owner' ? DONO_ID : (c && c.data.personId), out = {};
   Object.keys(F).forEach(id => { const f = F[id]; if ((f.estado === 'ok' || (!FOTO_CONFIRMAR && f.estado === 'pend')) && (r.role === 'owner' || vis.has(id))) out[id] = f.img;
     else if (id === eu && f.img) out[id] = f.img; }); // a própria pessoa vê a dela enquanto espera
   const minha = eu && F[eu] ? { estado: F[eu].estado, sim: F[eu].sim.length, precisa: FOTO_OK } : null;
   return { fotos: out, minha: minha }; }
 function fotoEnviar_(r, a) {
-  const c = cadLinha_(r.code), eu = c && c.data.personId; if (!eu) throw new Error('Só quem já está na árvore pode pôr a própria foto.');
-  if (c.data.pend) throw new Error('Aguarde a família confirmar você.');
+  const c = r.role === 'owner' ? null : cadLinha_(r.code), eu = r.role === 'owner' ? DONO_ID : (c && c.data.personId); if (!eu) throw new Error('Só quem já está na árvore pode pôr a própria foto.');
+  if (c && c.data.pend) throw new Error('Aguarde a família confirmar você.');
   const img = String(a.img || ''); if (!/^data:image\/jpeg;base64,/.test(img) || img.length > 48000) throw new Error('Foto inválida ou grande demais.');
   const F = fotos_(), f = F[eu] || {}; f.estado = 'pend'; f.img = img; f.em = Date.now(); f.sim = []; f.nao = [];
   if (eu === DONO_ID || !FOTO_CONFIRMAR) f.estado = 'ok'; // o dono não espera; e, com a regra suspensa, ninguém espera

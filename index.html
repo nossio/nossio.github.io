@@ -147,6 +147,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 .bal.eu{align-self:flex-end;background:#dcefd9;border-bottom-right-radius:4px}.bal.ele{align-self:flex-start;background:#f1ece2;border-bottom-left-radius:4px}
 .bal small{display:block;font-size:11px;color:var(--muted);margin-top:3px;text-align:right}
 .conv{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #eee5d3;cursor:pointer}.conv .av{margin:0;width:44px;height:44px;font-size:18px}
+.desc.curta{max-height:4.9em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
 </style>
 </head>
 <body><div id="busyBar"></div>
@@ -168,7 +169,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1030';
+const APPVER='v20261123-1020';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1353,7 +1354,7 @@ function openPerson(id){
   let h=`<div style="text-align:center">${avatar(p,84)}${ehMinha?`<div><button class="btn ghost" id="bFoto" style="margin-top:6px;font-size:14px;padding:6px 12px">📷 ${fotoDe(p)?'Trocar minha foto':'Pôr minha foto'}</button></div>${MINHA_FOTO&&MINHA_FOTO.estado==='pend'?`<div class="sub" style="margin:4px 0 0">Aguardando ${MINHA_FOTO.precisa-MINHA_FOTO.sim} parente(s) confirmarem que é você</div>`:MINHA_FOTO&&MINHA_FOTO.estado==='recusada'?'<div class="sub" style="margin:4px 0 0;color:var(--red)">A família não reconheceu a foto. Tente outra.</div>':''}`:''}</div>
     <h2 style="text-align:center">${esc(p.name)}</h2>
     <div class="sub" style="text-align:center">${p.apelido?'"'+esc(p.apelido)+'" · ':''}${p.birth?fmtDate(p.birth):''}${p.deceased?' – '+(p.death?fmtDate(p.death):'falecido(a)'):''}</div>
-    <div class="desc">${describe(p)}</div>`;
+    <div class="desc curta" id="pDesc">${describe(p)}</div><button class="btn ghost" id="pDescMais" style="font-size:13px;padding:4px 10px;margin:-2px 0 6px">Ver todos os parentes ▾</button>`;
   const miss=missingOf(p);
   if(isProv(p)) h+=`<div class="missing"><b>Ficha provisória.</b> ${miss.length?'Falta saber: '+esc(joinList(miss))+'.':''} Os dados ainda precisam ser confirmados.</div>`;
   else if(!F||!M) h+=`<div class="note">Falta ${!F&&!M?'pai e mãe':!F?'o pai':'a mãe'}. Toque em Editar e informe o nome — é pela filiação que o Nossio liga a família.</div>`;
@@ -1371,7 +1372,7 @@ function openPerson(id){
     h+=`<div style="margin-top:14px">${my?'<button class="btn ghost" id="bDados" style="width:100%;margin-bottom:8px">✏️ Meus dados</button>':''}<button class="btn ghost" id="bPriv" style="width:100%">${my?'🔒 Minha privacidade':'🙈 Não quero que '+esc(call(p))+' me veja'}</button></div>`; }
   if(window.NOSSIO_GAS&&isOwner) h+=`<div style="margin-top:14px"><button class="btn ghost" id="bHide" style="width:100%">${p.semNome?'👁️ Mostrar o nome de '+esc(call(p))+' para todos':'🙈 Esconder o nome de '+esc(call(p))+' de todos'}</button></div>`;
   if(canWrite&&isOwner) h+=`<div id="delBox" style="margin-top:18px"><button class="btn ghost" id="bDel" style="color:var(--red);border-color:var(--red)">Excluir ${esc(call(p))}</button></div>`;
-  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); } { const bc=document.getElementById('bChama'); if(bc) bc.onclick=()=>chamarPeloWhats(p); }
+  openSheet(h); { const bf=document.getElementById('bFoto'); if(bf) bf.onclick=()=>pegarFoto(); } { const bm=document.getElementById('bMsg'); if(bm) bm.onclick=()=>abrirChat(id); } { const bc=document.getElementById('bChama'); if(bc) bc.onclick=()=>chamarPeloWhats(p); } { const dm=document.getElementById('pDescMais'), dd=document.getElementById('pDesc'); if(dm&&dd){ if(dd.scrollHeight<=dd.clientHeight+4){ dd.classList.remove('curta'); dm.remove(); } else dm.onclick=()=>{ const c=dd.classList.toggle('curta'); dm.textContent=c?'Ver todos os parentes ▾':'Mostrar menos ▴'; }; } }
   wireLinks(document.getElementById('sheetBody'));
   { const bh=document.getElementById('bHide'); if(bh) bh.onclick=async()=>{ p.semNome=!p.semNome; try{ await savePerson(p); toast(p.semNome?'Nome escondido de todos':'Nome visível de novo'); }catch(e){} openPerson(id); render(); }; }
   { const bd=document.getElementById('bDados'); if(bd) bd.onclick=openMeusDados; }
