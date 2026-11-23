@@ -470,7 +470,7 @@ function msgLida_(r, a) { const eu = quemSou_(r), de = String(a.de || ''), s = a
   for (let i = 1; i < v.length; i++) if (String(v[i][1]) === de && String(v[i][2]) === eu && !v[i][5]) s.getRange(i + 1, 6).setValue(Date.now()); return { ok: true }; }
 // ---------- convite pelo próprio cartão: "você já está na árvore" ----------
 // quem já está dentro gera um link para um parente que ainda não entrou; quem abre só concorda com as regras e entra no próprio cartão
-function convitesAba_() { return abaCria_('convites', ['token', 'pessoa', 'por', 'em', 'usado']); }
+function convitesAba_() { return abaCria_('convitesCartao', ['token', 'pessoa', 'por', 'em', 'usado']); } // aba própria: 'convites' é a dos códigos de acesso
 function comConta_() { const s = new Set(cadastros_().map(c => c.personId).filter(Boolean)); s.add(DONO_ID); return s; }
 function cartaoCriar_(r, a) { const eu = quemSou_(r), para = String(a.para || ''), all = pessoas_(), P = all.find(p => p.id === para);
   if (!P || P.data.unnamed || P.data.deceased) throw new Error('Não dá para convidar esta pessoa.');
