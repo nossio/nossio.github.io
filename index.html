@@ -168,7 +168,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-0940';
+const APPVER='v20261123-0955';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1136,20 +1136,29 @@ async function e2eChave(){ if(E2E.k) return E2E.k; const sub=crypto.subtle; let 
 async function e2eSegredo(pubTxt){ const pub=await crypto.subtle.importKey('jwk',JSON.parse(pubTxt),{name:'ECDH',namedCurve:'P-256'},false,[]);
   return crypto.subtle.deriveKey({name:'ECDH',public:pub},await e2eChave(),{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
 async function e2eTrancar(texto,para){ await e2eChave(); const sub=crypto.subtle, ch=await gas('chaves',{para});
-  if(!ch.para.length) throw new Error('semChave');
   const K=crypto.getRandomValues(new Uint8Array(32)), iv=crypto.getRandomValues(new Uint8Array(12));
   const kk=await sub.importKey('raw',K,'AES-GCM',false,['encrypt']), ct=await sub.encrypt({name:'AES-GCM',iv},kk,new TextEncoder().encode(texto));
   const env={v:1,iv:b64(iv),ct:b64(ct),sdev:E2E.dev,spub:E2E.pubTxt,k:{}};
   for(const d of [...ch.para,...ch.minhas]){ const s2=await e2eSegredo(d.pub), iv2=crypto.getRandomValues(new Uint8Array(12)); env.k[d.dev]={iv:b64(iv2),w:b64(await sub.encrypt({name:'AES-GCM',iv:iv2},s2,K))}; }
-  return env; }
+  env.espera=!ch.para.length; return env; }
 async function e2eAbrir(m){ if(E2E.cache[m.id]!==undefined) return E2E.cache[m.id]; let t=null;
   try{ await e2eChave(); const e=m.env, mine=e.k&&e.k[E2E.dev]; if(mine){ const sub=crypto.subtle, s2=await e2eSegredo(e.spub);
       const K=await sub.decrypt({name:'AES-GCM',iv:unb64(mine.iv)},s2,unb64(mine.w)); const kk=await sub.importKey('raw',K,'AES-GCM',false,['decrypt']);
       t=new TextDecoder().decode(await sub.decrypt({name:'AES-GCM',iv:unb64(e.iv)},kk,unb64(e.ct))); } }catch(err){ t=null; }
   E2E.cache[m.id]=t; return t; }
+// mensagens guardadas: quando o destinatário já tem chave, este aparelho (de quem enviou) abre a própria cópia da chave da mensagem e tranca para ele
+let entregando=false;
+async function msgEntregarPendentes(){ if(entregando) return; const pend=E2E.msgs.filter(m=>m.de===E2E.eu&&m.espera&&m.env&&m.env.sdev===E2E.dev&&m.env.k&&m.env.k[E2E.dev]); if(!pend.length) return; entregando=true;
+  try{ const sub=crypto.subtle, porPara={};
+    for(const m of pend){ let ch=porPara[m.para]; if(!ch){ try{ ch=porPara[m.para]=await gas('chaves',{para:m.para}); }catch(e){ continue; } } if(!ch.para.length) continue;
+      const mine=m.env.k[E2E.dev], s2=await e2eSegredo(m.env.spub); const K=new Uint8Array(await sub.decrypt({name:'AES-GCM',iv:unb64(mine.iv)},s2,unb64(mine.w)));
+      const k={}; for(const d of ch.para){ if(m.env.k[d.dev]) continue; const s3=await e2eSegredo(d.pub), iv2=crypto.getRandomValues(new Uint8Array(12)); k[d.dev]={iv:b64(iv2),w:b64(await sub.encrypt({name:'AES-GCM',iv:iv2},s3,K))}; }
+      // o destinatário abre com a chave pública de quem enviou (spub) — o segredo é o mesmo dos dois lados
+      await gas('msgEntregar',{id:m.id,k}); Object.assign(m.env.k,k); m.espera=false; }
+  }catch(e){} entregando=false; if(E2E.aberta) desenhaChat(); }
 async function msgBuscar(){ if(!window.NOSSIO_GAS) return; try{ await e2eChave(); const r=await gas('msgs',{desde:E2E.desde}); E2E.eu=r.eu;
     const ids=new Set(E2E.msgs.map(m=>m.id)); r.msgs.forEach(m=>{ if(!ids.has(m.id)) E2E.msgs.push(m); else { const x=E2E.msgs.find(y=>y.id===m.id); x.lida=m.lida; } });
-    if(r.msgs.length) E2E.desde=Math.max(E2E.desde,...r.msgs.map(m=>m.em)); msgBadge(); if(E2E.aberta) desenhaChat(); }catch(e){} }
+    if(r.msgs.length) E2E.desde=Math.max(E2E.desde,r.agora-8000); msgBadge(); if(E2E.aberta) desenhaChat(); msgEntregarPendentes(); }catch(e){} }
 function msgBadge(){ const n=E2E.msgs.filter(m=>m.para===E2E.eu&&!m.lida).length, b=document.getElementById('msgN'); if(!b) return; b.hidden=!n; b.textContent=n; }
 function nomeDe(id){ const p=byId(id); return p?(p.apelido||p.name):'Alguém'; }
 function hora(t){ const d=new Date(t), h=new Date(); return d.toDateString()===h.toDateString()?d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
@@ -1174,8 +1183,8 @@ async function abrirChat(outro){ E2E.aberta=outro; const p=byId(outro)||{name:'?
     <div id="mErr" style="color:var(--red);font-size:14px;min-height:18px"></div><button class="btn ghost" id="mVolta" style="width:100%">← Conversas</button>`);
   document.getElementById('mVolta').onclick=abrirConversas;
   const env=async()=>{ const t=document.getElementById('mTxt'), tx=t.value.trim(); if(!tx) return; const er=document.getElementById('mErr'); er.textContent='';
-    try{ const e=await e2eTrancar(tx,outro); const r=await gas('msgEnviar',{para:outro,env:e}); const m={id:r.id,de:E2E.eu,para:outro,em:r.em,env:e,lida:false}; E2E.cache[r.id]=tx; E2E.msgs.push(m); t.value=''; desenhaChat(); }
-    catch(e){ er.textContent=String(e.message)==='semChave'?`${nomeDe(outro)} ainda não abriu esta versão do Nossio. Quando abrir, você já consegue mandar.`:'Não foi possível enviar: '+(e.message||e); } };
+    try{ const e=await e2eTrancar(tx,outro); const esp=!!e.espera; delete e.espera; const r=await gas('msgEnviar',{para:outro,env:e,espera:esp}); const m={id:r.id,de:E2E.eu,para:outro,em:r.em,env:e,lida:false,espera:esp}; E2E.cache[r.id]=tx; E2E.msgs.push(m); t.value=''; desenhaChat(); }
+    catch(e){ er.textContent='Não foi possível enviar: '+(e.message||e); } };
   document.getElementById('mEnv').onclick=env;
   document.getElementById('mTxt').onkeydown=e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); env(); } };
   await msgBuscar(); desenhaChat();
@@ -1183,7 +1192,7 @@ async function abrirChat(outro){ E2E.aberta=outro; const p=byId(outro)||{name:'?
 }
 async function desenhaChat(){ const box=document.getElementById('mChat'), o=E2E.aberta; if(!box||!o) return;
   const l=E2E.msgs.filter(m=>(m.de===o&&m.para===E2E.eu)||(m.para===o&&m.de===E2E.eu)).sort((a,b)=>a.em-b.em);
-  const partes=[]; for(const m of l){ const t=await e2eAbrir(m); partes.push(`<div class="bal ${m.de===E2E.eu?'eu':'ele'}">${t===null?'<i>🔒 Mensagem trancada para outro aparelho</i>':esc(t)}<small>${hora(m.em)}${m.de===E2E.eu&&m.lida?' ✓✓':''}</small></div>`); }
+  const partes=[]; for(const m of l){ const t=await e2eAbrir(m); partes.push(`<div class="bal ${m.de===E2E.eu?'eu':'ele'}">${t===null?'<i>🔒 Mensagem trancada para outro aparelho</i>':esc(t)}<small>${hora(m.em)}${m.de===E2E.eu?(m.espera?' · 🕓 guardada: chega quando '+esc(nomeDe(o).split(' ')[0])+' abrir o Nossio':m.lida?' ✓✓':' ✓'):''}</small></div>`); }
   const fim=box.scrollTop+box.clientHeight>=box.scrollHeight-20; box.innerHTML=partes.join('')||'<div class="sub">Nenhuma mensagem ainda. Diga um oi!</div>'; if(fim||true) box.scrollTop=box.scrollHeight;
   if(l.some(m=>m.de===o&&!m.lida)){ gas('msgLida',{de:o}).then(()=>{ E2E.msgs.forEach(m=>{ if(m.de===o) m.lida=true; }); msgBadge(); }).catch(()=>{}); } }
 function iniciaMensagens(){ if(!window.NOSSIO_GAS||!(isOwner||(myCad&&myCad.personId&&!myCad.pend))) return; if(!window.crypto||!crypto.subtle) return;

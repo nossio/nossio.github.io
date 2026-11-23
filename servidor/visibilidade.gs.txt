@@ -453,14 +453,22 @@ function msgEnviar_(r, a) { const eu = quemSou_(r), para = String(a.para || '');
   if (!podeFalar_(r, eu, para)) throw new Error('Sem permissão.');
   const env = JSON.stringify(a.env || {}); if (env.length > 45000) throw new Error('Mensagem grande demais.');
   const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), em = Date.now();
-  abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']).appendRow([id, eu, para, em, env, '']); return { id: id, em: em }; }
+  abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida', 'espera']).appendRow([id, eu, para, em, env, '', a.espera ? 1 : '']); return { id: id, em: em }; }
 function msgs_(r, a) { const eu = quemSou_(r), desde = Number(a.desde) || 0, v = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']).getDataRange().getValues(), out = [];
   for (let i = 1; i < v.length; i++) { const de = String(v[i][1]), para = String(v[i][2]), em = Number(v[i][3]) || 0;
-    if ((de === eu || para === eu) && em > desde) out.push({ id: String(v[i][0]), de: de, para: para, em: em, env: JSON.parse(v[i][4] || '{}'), lida: !!v[i][5] }); }
+    const espera = !!v[i][6], ent = Number(v[i][7]) || 0;
+    if (para === eu && espera) continue; // ainda trancada só para quem enviou: chega quando o destinatário tiver chave
+    if ((de === eu || para === eu) && (em > desde || ent > desde)) out.push({ id: String(v[i][0]), de: de, para: para, em: em, env: JSON.parse(v[i][4] || '{}'), lida: !!v[i][5], espera: espera }); }
   return { eu: eu, msgs: out, agora: Date.now() }; }
+// quem enviou, ao ver que o destinatário já tem chave, acrescenta as chaves dele e a mensagem é entregue
+function msgEntregar_(r, a) { const eu = quemSou_(r), s = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida', 'espera']), v = s.getDataRange().getValues();
+  for (let i = 1; i < v.length; i++) if (String(v[i][0]) === String(a.id)) { if (String(v[i][1]) !== eu) throw new Error('Sem permissão.');
+    const env = JSON.parse(v[i][4] || '{}'); env.k = Object.assign(env.k || {}, a.k || {}); const txt = JSON.stringify(env); if (txt.length > 45000) throw new Error('Grande demais.');
+    s.getRange(i + 1, 5).setValue(txt); s.getRange(i + 1, 7, 1, 2).setValues([['', Date.now()]]); return { ok: true }; }
+  throw new Error('Não encontrada.'); }
 function msgLida_(r, a) { const eu = quemSou_(r), de = String(a.de || ''), s = abaCria_('msgs', ['id', 'de', 'para', 'em', 'env', 'lida']), v = s.getDataRange().getValues();
   for (let i = 1; i < v.length; i++) if (String(v[i][1]) === de && String(v[i][2]) === eu && !v[i][5]) s.getRange(i + 1, 6).setValue(Date.now()); return { ok: true }; }
 // ações novas (o Código.gs chama estas duas funções)
 function extra_(acao, r, a) { if (acao === 'fotos') return fotosVer_(r); if (acao === 'msgs') return msgs_(r, a); if (acao === 'chaves') return chavesDe_(r, a); }
 function extraLock_(acao, r, a) { if (acao === 'fotoEnviar') return fotoEnviar_(r, a); if (acao === 'fotoTirar') return fotoTirar_(r);
-  if (acao === 'chavePub') return chavePub_(r, a); if (acao === 'msgEnviar') return msgEnviar_(r, a); if (acao === 'msgLida') return msgLida_(r, a); }
+  if (acao === 'chavePub') return chavePub_(r, a); if (acao === 'msgEnviar') return msgEnviar_(r, a); if (acao === 'msgLida') return msgLida_(r, a); if (acao === 'msgEntregar') return msgEntregar_(r, a); }
