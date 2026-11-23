@@ -238,7 +238,8 @@ function checaSet_(r, a) {
     if (P && !P.data.unnamed && d[k] !== v) throw new Error('Pai e mãe já ligados só o Ilacir pode trocar.'); });
   // a ficha de quem tem cadastro é só dela: os outros só podem preencher um vínculo que estava vazio (pais de menor podem tudo)
   const eu = c && c.data.personId;
-  if (antigo && antigo.id !== eu && comCadastro_().has(antigo.id) && !(menor_(antigo.data) && [antigo.data.father, antigo.data.mother].includes(eu))) {
+  if (antigo && antigo.id !== eu && comCadastro_().has(antigo.id) && !(menor_(antigo.data) && [antigo.data.father, antigo.data.mother].includes(eu))
+      && !(eu && (antigo.data.spouse === eu || antigo.data.createdBy === r.uid))) { // por enquanto: o cônjuge e quem cadastrou a ficha também podem
     const livre = new Set(['father', 'mother', 'parents', 'spouse', 'updatedBy', 'updatedByName', 'updatedAt', 'possivelDup', 'links', 'bloqueia', 'oculto', 'saiu', 'semNome']);
     const nv = v => (v === undefined || v === null || v === '' || v === false || (Array.isArray(v) && !v.length)) ? '' : JSON.stringify(v);
     const quem = String(antigo.data.apelido || antigo.data.name || '').split(' ')[0];

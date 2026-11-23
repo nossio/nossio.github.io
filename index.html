@@ -173,7 +173,7 @@ body.ocupado #busyBar{opacity:1;animation:busyfx 1s linear infinite}
 /* ---------- Nossio fora do Claude: dados no Google (Apps Script) ---------- */
 window.NOSSIO_GAS=true;
 // versão da tela: se o celular estiver com uma cópia antiga guardada, busca a nova e recarrega sozinho (uma vez)
-const APPVER='v20261123-1350';
+const APPVER='v20261123-1400';
 const checaVersao=async()=>{ try{ const t=await fetch(location.pathname+'?nv='+Date.now(),{cache:'no-store'}).then(r=>r.text()); const m=t.match(/APPVER='([^']+)'/);
   if(!m||m[1]===APPVER||sessionStorage.getItem('nossio-rl')===m[1]) return;
   // não recarrega no meio de algo aberto (a pessoa pode estar escrevendo); tenta de novo depois
@@ -1212,7 +1212,8 @@ let COMCONTA=null;
 function podeCorrigir(p){ if(isOwner||!window.NOSSIO_GAS) return true; const eu=myCad&&myCad.personId; if(p.id===eu) return true;
   if(!COMCONTA||!COMCONTA.has(p.id)) return true;
   let men=false; if(p.birth&&!p.deceased){ const b=new Date(p.birth+'T12:00:00'), t=new Date(); let a=t.getFullYear()-b.getFullYear(); if(t<new Date(t.getFullYear(),b.getMonth(),b.getDate())) a--; men=a<18; }
-  return men&&(p.father===eu||p.mother===eu); }
+  if(men&&(p.father===eu||p.mother===eu)) return true;
+  return !!eu&&(p.spouse===eu||(myId&&p.createdBy===myId)); } // por enquanto: o cônjuge e quem cadastrou também podem
 async function carregaComConta(){ if(!window.NOSSIO_GAS) return; try{ COMCONTA=new Set(await gas('comConta')); }catch(e){} }
 async function chamarPeloWhats(p){ try{ const r=await gas('cartaoCriar',{para:p.id}); const prim=(p.apelido||p.name).split(' ')[0];
     const desc=(()=>{ const f=byId(p.father), m=byId(p.mother), nm=x=>x&&!x.unnamed?(x.apelido||x.name).split(' ')[0]:''; const pais=[nm(f),nm(m)].filter(Boolean);
@@ -1993,7 +1994,7 @@ function openAcrescentar(startId,baseId,livre){
     // o sexo sai da própria resposta (filha, mãe, esposa…)
     const sexos=[...new Set(links.map(l=>l.sex))]; if(sexos.length>1){ salvando=false; return document.getElementById('aErr').textContent='As respostas misturam masculino e feminino — confira.'; }
     const touched=new Set(); warns=[]; dropIds=new Set();
-    if(!P){ P={id:newId(),name:novo.name,apelido:novo.apelido||'',sex:sexos[0],birth:'',deceased:false,death:'',photo:null,father:null,mother:null,parents:[],spouse:null,provisional:true,createdAt:Date.now()}; people.push(P); }
+    if(!P){ P={id:newId(),name:novo.name,apelido:novo.apelido||'',sex:sexos[0],birth:'',deceased:false,death:'',photo:null,father:null,mother:null,parents:[],spouse:null,provisional:true,createdAt:Date.now()}; if(myId){P.createdBy=myId; P.createdByName=myName();} people.push(P); }
     else if(!P.sex) P.sex=sexos[0];
     touched.add(P);
     for(const l of links) await applyRel(P,{rel:l.rel,label:''},l.T,touched);
